@@ -1,312 +1,224 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.IO;
 using SkiaSharp;
 
 namespace LivInParis
 {
+    // Classe générique représentant un nœud (par exemple, une station)
+    public class Noeud<T>
+    {
+        public T Id { get; set; }
+        public List<T> Connexions { get; set; } = new List<T>();
+    }
+
+    // Classe générique représentant une liaison entre deux nœuds avec un poids (temps de trajet)
+    public class Lien<T>
+    {
+        public T N1 { get; set; }
+        public T N2 { get; set; }
+        public double Poids { get; set; }  // Poids pour représenter le temps de trajet
+    }
+
+    // Classe générique pour un graphe
+    public class Graphe<T>
+    {
+        // Dictionnaire qui associe un identifiant de nœud à son objet Noeud<T>
+        public Dictionary<T, Noeud<T>> Nodes { get; private set; } = new Dictionary<T, Noeud<T>>();
+
+        // Liste des liaisons (arêtes) du graphe
+        public List<Lien<T>> Liens { get; private set; } = new List<Lien<T>>();
+
+        /// <summary>
+        /// Constructeur qui prend la liste des nœuds (identifiants) et la liste des liaisons
+        /// </summary>
+        public Graphe(IEnumerable<T> noeuds, IEnumerable<Lien<T>> liens)
+        {
+            foreach (var id in noeuds)
+            {
+                Nodes[id] = new Noeud<T> { Id = id };
+            }
+            foreach (var lien in liens)
+            {
+                if (Nodes.ContainsKey(lien.N1) && Nodes.ContainsKey(lien.N2))
+                {
+                    Nodes[lien.N1].Connexions.Add(lien.N2);
+                    Nodes[lien.N2].Connexions.Add(lien.N1);
+                    Liens.Add(lien);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Affiche la liste d’adjacence.
+        /// </summary>
+        public void Afficher_L_Adjacence()
+        {
+            foreach (var node in Nodes.Values)
+            {
+                Console.Write($"{node.Id}: ");
+                Console.WriteLine(string.Join(", ", node.Connexions));
+            }
+        }
+
+
+
+        
+
+       
+
+        /// <summary>
+        /// Génère une image du graphe avec SkiaSharp.
+        /// </summary>
+        public void GenererImageGraphe(string chemin)
+        {
+            int largeur = 1000, hauteur = 1000;
+            Random rand = new Random();
+            using (var surface = SKSurface.Create(new SKImageInfo(largeur, hauteur)))
+            {
+                var canvas = surface.Canvas;
+                canvas.Clear(SKColors.White);
+
+                SKPaint edgePaint = new SKPaint { Color = SKColors.Black, StrokeWidth = 2 };
+                SKPaint nodePaint = new SKPaint { Color = SKColors.Blue, StrokeWidth = 2 };
+                SKPaint textPaint = new SKPaint { Color = SKColors.Black, TextSize = 24, IsAntialias = true };
+
+                double centerX = largeur / 2.0, centerY = hauteur / 2.0;
+
+                // Choisir le nœud central (celui ayant le plus de connexions)
+                var centralNode = Nodes.Values.OrderByDescending(n => n.Connexions.Count).First();
+                var outerNodes = Nodes.Values.Where(n => !n.Id.Equals(centralNode.Id)).ToList();
+
+                float centralNodeRadius = 40;
+                float outerNodeRadiusBase = 20;
+                float minDistance = 50;
+
+                Dictionary<T, SKPoint> nodePositions = new Dictionary<T, SKPoint>();
+                nodePositions[centralNode.Id] = new SKPoint((float)centerX, (float)centerY);
+
+                // Fonction locale pour vérifier le chevauchement
+                bool CheckForOverlap(SKPoint newPosition, Dictionary<T, SKPoint> existingPositions, float radius)
+                {
+                    foreach (var pos in existingPositions.Values)
+                    {
+                        float distance = (float)Math.Sqrt(Math.Pow(newPosition.X - pos.X, 2) + Math.Pow(newPosition.Y - pos.Y, 2));
+                        if (distance < radius + minDistance)
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+
+                // Placement aléatoire des autres nœuds sans chevauchement
+                foreach (var outer in outerNodes)
+                {
+                    SKPoint newPosition;
+                    bool overlap;
+                    do
+                    {
+                        float x = (float)(rand.NextDouble() * largeur);
+                        float y = (float)(rand.NextDouble() * hauteur);
+                        newPosition = new SKPoint(x, y);
+                        overlap = CheckForOverlap(newPosition, nodePositions, outerNodeRadiusBase);
+                    } while (overlap);
+                    nodePositions[outer.Id] = newPosition;
+                }
+
+                // Dessiner les arêtes (on ne dessine chaque arête qu'une seule fois)
+                HashSet<string> drawnEdges = new HashSet<string>();
+                foreach (var node in Nodes.Values)
+                {
+                    foreach (var voisin in node.Connexions)
+                    {
+                        string edgeKey = string.Compare(node.Id.ToString(), voisin.ToString()) < 0 ?
+                            node.Id.ToString() + "-" + voisin.ToString() :
+                            voisin.ToString() + "-" + node.Id.ToString();
+                        if (!drawnEdges.Contains(edgeKey))
+                        {
+                            if (nodePositions.ContainsKey(node.Id) && nodePositions.ContainsKey(voisin))
+                            {
+                                canvas.DrawLine(nodePositions[node.Id], nodePositions[voisin], edgePaint);
+                            }
+                            drawnEdges.Add(edgeKey);
+                        }
+                    }
+                }
+
+                // Dessiner les nœuds
+                foreach (var node in Nodes.Values)
+                {
+                    float nodeSize = Math.Max(outerNodeRadiusBase, 5 + 2 * node.Connexions.Count);
+                    var position = nodePositions[node.Id];
+                    canvas.DrawCircle(position, nodeSize, nodePaint);
+                    canvas.DrawText(node.Id.ToString(), position.X - 10, position.Y + 10, textPaint);
+                }
+
+                // Sauvegarder l'image dans un fichier
+                using (var img = surface.Snapshot())
+                using (var data = img.Encode(SKEncodedImageFormat.Png, 100))
+                using (var stream = File.OpenWrite(chemin))
+                {
+                    data.SaveTo(stream);
+                }
+            }
+        }
+
+        
+    }
+
     internal class Program
     {
-
-        public  class Noeud
-        {
-            public int Numéro { get ; set; }
-            public List<int> Connexion { get ; set; } = new List<int>();
-        }
-        public class  Lien
-        {
-            public int N1 { get; set; }
-            public int N2 { get; set; }
-        }
-        public class  Graphe
-        {
-            public List<Noeud>  L_Adjacence { get; set; } = new List<Noeud>();
-            public int[,]  M_Adjacence { get; set; }
-            public int  N_Noeuds { get; set; }
-
-            public Graphe(int n_Noeuds , List<Lien> liens)
-            {
-                N_Noeuds = n_Noeuds;
-                M_Adjacence = new int[n_Noeuds + 1, n_Noeuds + 1];
-
-                for (int i = 1 ; i <= n_Noeuds; i++)
-                {
-                    L_Adjacence.Add(new Noeud { Numéro = i });
-                }
-                foreach (var  lien in liens)
-                {
-                    L_Adjacence[lien.N1 - 1].Connexion.Add(lien.N2);
-                    L_Adjacence[lien.N2 - 1].Connexion.Add(lien.N1);
-
-                    M_Adjacence[lien.N1, lien.N2] = 1;
-                    M_Adjacence[lien.N2, lien.N1] = 1;
-                }
-            }
-            public void  Afficher_L_Adjacence()
-            {
-                foreach  (var noeud in L_Adjacence)
-                {
-                    Console.Write($"{noeud.Numéro}: ");
-                    Console.WriteLine(string.Join(", ", noeud.Connexion));
-                    /*Console.Write(noeud.Numéro + ": ");
-                    foreach (var Connexion in noeud.Connexion) 
-                    {
-                        Console.Write(noeud.Connexion + " ;");
-                    }
-                    Console.WriteLine("");*/
-                }
-            }
-
-             
-            public void Afficher_M_Adjacence()
-            {
-                for (int i = 1;  i <= N_Noeuds; i++)
-                {
-                    for (int j = 1;  j <= N_Noeuds; j++)
-                    {
-                        Console.Write(M_Adjacence[i, j] + " ");
-                    }
-                    Console.WriteLine();
-                }
-            }
-
-            /// <summary>
-            /// effectue le parcours avec add et laisser la priorité
-            /// </summary>
-            /// <param name="depart"></param>
-            /// <returns></returns>
-            public List<int> ParcoursLargeur_Travail(int depart)
-            {
-                Queue<int> file = new Queue<int>();
-                HashSet<int> visite = new HashSet<int>();
-                List<int> res = new List<int>();
-                file.Enqueue(depart);
-                visite.Add(depart);
-
-
-                while (file.Count >  0)
-                {
-                    int noeud = file.Dequeue();
-                    res.Add(noeud);
-
-
-                    foreach (var voisin in L_Adjacence[noeud - 1].Connexion)
-                    {
-                        if (!visite.Contains(voisin))
-                        {
-                            file.Enqueue(voisin);
-                            visite.Add(voisin);
-                        }
-                    }
-                }
-                return res;
-            }
-            /// <summary>
-            /// affiche le resulat de ParcoursLargeur_Travail
-            /// </summary>
-            /// <param name="depart"></param>
-            public void  ParcoursLargeur(int depart)
-            {
-                Console.Write("Parcours longueur" + " ");
-                List<int> res = new List<int>();
-                for (int i = 0; i < ParcoursLargeur_Travail(depart).Count; i++)
-                {
-                    res.Add(ParcoursLargeur_Travail(depart)[i]);
-                    Console.Write(res[i] + " ");
-                }
-                Console.WriteLine("");
-            }
-
-            public bool  Est_Connexe()
-            {
-                return ParcoursLargeur_Travail(1).Count == N_Noeuds;
-            }
-
-            /// <summary>
-            /// genere l'image
-            /// </summary>
-            /// <param name="chemin"></param>
-            public void  GenererImageGraphe(string chemin)
-            {
-                int largeur =1000 , height = 1000;
-                Random rand = new Random(); 
-                using (var surface = SKSurface.Create(new SKImageInfo(largeur, height)))
-                {
-                    var canvas = surface.Canvas;
-                    canvas.Clear(SKColors.White);
-
-                    SKPaint edgePaint = new SKPaint { Color = SKColors.Black, StrokeWidth = 2 };
-                    SKPaint nodePaint = new SKPaint { Color = SKColors.Blue, StrokeWidth = 2 };
-                    SKPaint textPaint = new SKPaint { Color = SKColors.White, TextSize = 24, IsAntialias = true };
-
-                    
-                    double centerX = largeur / 2, centerY = height / 2;
-
-                    
-                    Noeud centralNode = L_Adjacence.OrderByDescending(n => n.Connexion.Count).First();
-                    List<Noeud> outerNodes = L_Adjacence.Where(n => n != centralNode).ToList();
-
-                    
-                    float centralNodeRadius = 40;
-                    float outerNodeRadiusBase = 20; 
-                    float minDistance = 50;
-
-                    
-                    Dictionary<int, SKPoint> nodePositions = new Dictionary<int, SKPoint>();
-
-                    
-                    nodePositions[centralNode.Numéro] = new SKPoint((float)centerX, (float)centerY);
-
-                   
-                    bool CheckForOverlap(SKPoint newPosition, Dictionary<int, SKPoint> existingPositions, float radius)
-                    {
-                        foreach (var position in existingPositions.Values)
-                        {
-                            float distance = (float)Math.Sqrt(Math.Pow(newPosition.X - position.X, 2) + Math.Pow(newPosition.Y - position.Y, 2));
-                            if (distance < radius + minDistance)
-                            {
-                                return true; 
-                            }
-                        }
-                        return false; 
-                    }
-
-                    
-                    foreach (var outerNode in outerNodes)
-                    {
-                        SKPoint newPosition;
-                        bool overlap;
-                        do
-                        {
-                            float x = (float)(rand.NextDouble() * largeur); 
-                            float y = (float)(rand.NextDouble() * height);
-                            newPosition = new SKPoint(x, y);
-
-                            
-                            overlap = CheckForOverlap(newPosition, nodePositions, outerNodeRadiusBase);
-                        } while (overlap); 
-
-                        nodePositions[outerNode.Numéro] = newPosition;
-                    }
-
-                    
-                    foreach (var noeud in L_Adjacence)
-                    {
-                        foreach (var voisin in noeud.Connexion)
-                        {
-                            if (noeud.Numéro < voisin)
-                            {
-                                canvas.DrawLine(nodePositions[noeud.Numéro], nodePositions[voisin], edgePaint);
-                            }
-                        }
-                    }
-
-                    
-                    foreach (var noeud in L_Adjacence)
-                    {
-                        
-                        float nodeSize = Math.Max(outerNodeRadiusBase, 5 + 2 * noeud.Connexion.Count);
-                        var position = nodePositions[noeud.Numéro];
-                        canvas.DrawCircle(position, nodeSize, nodePaint);
-                        canvas.DrawText(  noeud.Numéro.ToString(), position.X - 10, position.Y + 10, textPaint);
-                    }
-
-                    // Save the image to a file
-                    using (var img = surface.Snapshot())
-                    using (var data = img.Encode(SKEncodedImageFormat.Png, 100))
-                    using (var stream = File.OpenWrite(chemin))
-                    {
-                        data.SaveTo(stream);
-                    }
-                }
-            }
-
-
-         
-   
-
-
-            /// <summary>
-            /// parcours en profondeur avec push pour suivre directement
-            /// </summary>
-            /// <param name="depart"></param>
-        public void ParcoursProfondeur(int depart)
-            {
-                Stack<int> pile = new Stack<int>();
-                HashSet<int> visite = new HashSet<int>();
-                pile.Push(depart);
-
-                Console.Write("Parcours en profondeur : ");
-                while (pile.Count > 0)
-                {
-                    int noeud = pile.Pop();
-                    if (!visite.Contains(noeud))
-                    {
-                        Console.Write(noeud + " ");
-                        visite.Add(noeud);
-                    }
-
-                    foreach (var voisin in L_Adjacence[noeud - 1].Connexion)
-                    {
-                        if (!visite.Contains(voisin))
-                        {
-                            pile.Push(voisin);
-                        }
-                    }
-                }
-                
-            }
-
-        }
-
-        
-        
-
         static void Main(string[] args)
         {
-
-            List<Lien> liens = new List<Lien>();
-            int nombreNoeuds = 0;
-
-            // Lecture du fichier soc-karate.mtx
-            string path = "soc-karate.mtx";
-            foreach (string line in File.ReadLines(path))
+            // Pour la démonstration, nous simulons une partie du plan du métro de Paris
+            // avec des temps de trajet (en minutes) associés à chaque liaison.
+            List<string> stations = new List<string>
             {
-                if (line.StartsWith("%")) continue; // Ignorer les commentaires
-                string[] parts = line.Split();
-                if (parts.Length != 2)
-                {
-                    nombreNoeuds = int.Parse(parts[0]);
-                }
-                else if (parts.Length == 2)
-                {
-                    int noeud1 = int.Parse(parts[0]);
-                    int noeud2 = int.Parse(parts[1]);
-                    liens.Add(new Lien { N1 = noeud1, N2 = noeud2 });
-                }
-            }
+                "Châtelet",
+                "Gare du Nord",
+                "Saint-Lazare",
+                "Montparnasse",
+                "Bastille",
+                "République",
+                "Opéra",
+                "Nation"
+            };
 
-            Graphe graphe = new Graphe(nombreNoeuds, liens);
-            Console.WriteLine("Liste d'adjacence:");
-            graphe.Afficher_L_Adjacence();
-            if (graphe.Est_Connexe()) 
+            // Définition des liaisons entre stations avec leur temps de trajet
+            List<Lien<string>> liens = new List<Lien<string>>
             {
-                Console.WriteLine("Graphe Connexe");
-            }
-            else
-            {
-                Console.WriteLine("Graohe non Connexe");
-            }
-            for (int i = 1; i < nombreNoeuds; i++) 
-            {
-                graphe.ParcoursLargeur(i);
-            }
+                new Lien<string>{ N1 = "Châtelet", N2 = "Gare du Nord", Poids = 5 },
+                new Lien<string>{ N1 = "Châtelet", N2 = "Saint-Lazare", Poids = 7 },
+                new Lien<string>{ N1 = "Châtelet", N2 = "Opéra", Poids = 4 },
+                new Lien<string>{ N1 = "Gare du Nord", N2 = "République", Poids = 6 },
+                new Lien<string>{ N1 = "Saint-Lazare", N2 = "Montparnasse", Poids = 8 },
+                new Lien<string>{ N1 = "Montparnasse", N2 = "Bastille", Poids = 5 },
+                new Lien<string>{ N1 = "Bastille", N2 = "Nation", Poids = 10 },
+                new Lien<string>{ N1 = "Opéra", N2 = "République", Poids = 3 },
+                new Lien<string>{ N1 = "République", N2 = "Nation", Poids = 4 }
+            };
 
-            Graphe graphedessin = new Graphe(nombreNoeuds, liens);
-            string imagePath = "graphe.png";
-            graphe.GenererImageGraphe(imagePath);
-            Console.WriteLine($"Graph image saved to {imagePath}");
+            // Création du graphe générique à partir des stations et liaisons
+            Graphe<string> metroGraph = new Graphe<string>(stations, liens);
 
-            Console.WriteLine("\nMatrice d'adjacence:");
-            graphe.Afficher_M_Adjacence();
-            Console.WriteLine("Press any key to exit");
+            Console.WriteLine("Liste d'adjacence du plan du métro de Paris :");
+            metroGraph.Afficher_L_Adjacence();
+
+            // Génération de l'image du graphe
+            string imagePath = "metroGraph.png";
+            metroGraph.GenererImageGraphe(imagePath);
+            Console.WriteLine($"Image du graphe sauvegardée sous {imagePath}");
+
+          
+            var trajetFinal = metroGraph.ReconstruireChemin("Châtelet", "Nation", Pred);
+            Console.WriteLine("Trajet final de Châtelet à Nation : " + string.Join(" -> ", trajetFinal));
+
+
+
+
+            Console.WriteLine("Appuyez sur une touche pour quitter.");
             Console.ReadKey();
         }
     }
