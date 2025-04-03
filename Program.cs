@@ -22,13 +22,13 @@ namespace LIP
 
                 if (!precedent.ContainsKey(current))
                 {
-                    Console.WriteLine("❌ Aucun chemin trouvé.");
+                    Console.WriteLine("Aucun chemin");
                     return;
                 }
 
                 int pred = precedent[current];
 
-                // 🔢 Addition du poids si matrice fournie
+                // si matrice
                 if (matricePoids != null)
                 {
                     poidsTotal += matricePoids[pred, current];
@@ -40,7 +40,7 @@ namespace LIP
             chemin.Add(depart);
             chemin.Reverse();
 
-            Console.WriteLine("🧭 Chemin trouvé :");
+            Console.WriteLine("Chemin trouvé :");
             for (int i = 0; i < chemin.Count; i++)
             {
                 int id = chemin[i];
@@ -48,14 +48,14 @@ namespace LIP
                     ? nomsGares[id - 1]
                     : $"Gare {id}";
 
-                Console.Write($"→ {nom}");
+                Console.Write($"-> {nom}");
                 if (i < chemin.Count - 1) Console.WriteLine();
             }
 
-            // 🕒 Affichage du poids total
+            // poids total
             if (matricePoids != null)
             {
-                Console.WriteLine($"\n🕒 Temps total estimé : {poidsTotal} min");
+                Console.WriteLine($"\n Temps total : {poidsTotal} min");
             }
 
             Console.WriteLine();
@@ -128,130 +128,160 @@ namespace LIP
                 }
             }
 
-            public void DijkstraParNom(string nomDepart, string nomArrivee, List<string> nomsGares)
+            public void Dijkstra(string nomDepart, string nomArrivee, List<string> nomsGares)
             {
-                int depart = nomsGares.FindIndex(n => string.Equals(n, nomDepart, StringComparison.OrdinalIgnoreCase)) + 1;
-                int arrivee = nomsGares.FindIndex(n => string.Equals(n, nomArrivee, StringComparison.OrdinalIgnoreCase)) + 1;
+                int idDepart = nomsGares.FindIndex(n => n.Equals(nomDepart, StringComparison.OrdinalIgnoreCase)) + 1;
+                int idArrivee = nomsGares.FindIndex(n => n.Equals(nomArrivee, StringComparison.OrdinalIgnoreCase)) + 1;
 
-                if (depart <= 0 || arrivee <= 0)
+                if (idDepart <= 0 || idArrivee <= 0)
                 {
-                    Console.WriteLine("❌ Gare de départ ou d'arrivée introuvable.");
+                    Console.WriteLine( "Une des deux gares non existente");
                     return;
+                
                 }
 
-                var distances = new Dictionary<int, int>();
-                var precedent = new Dictionary<int, int>();
-                var nonVisites = new HashSet<int>();
+                var distances  = new Dictionary<int, int>();
+                var precedents =  new Dictionary<int, int>();
+                var nonVisites =  new HashSet<int>();
 
-                for (int i = 1; i <= N_Noeuds; i++)
+                // Intitialisation(infini
+                for ( int i = 1; i <= N_Noeuds; i++)
                 {
-                    distances[i] = int.MaxValue;
-                    nonVisites.Add(i);
+                    distances[i]  = 99999;
+                    nonVisites.Add(i );
                 }
 
-                distances[depart] = 0;
 
-                while (nonVisites.Count > 0)
+
+                distances[idDepart] =  0;
+                 
+                while (  nonVisites.Count > 0)
                 {
-                    int u = nonVisites.OrderBy(n => distances[n]).First();
-                    nonVisites.Remove(u);
+                    // Noeud plus proche
+                    int N_actuel  = nonVisites.OrderBy(n => distances[n]).First();
+                    nonVisites.Remove(N_actuel );
 
-                    foreach (var voisin in L_Adjacence[u - 1].Connexion)
+                    //Voisin direct
+                    foreach (var voisin in L_Adjacence[N_actuel - 1].Connexion)
                     {
-                        if (!nonVisites.Contains(voisin)) continue;
-
-                        int poids = M_Adjacence[u, voisin];
-                        int alt = distances[u] + poids;
-
-                        if (alt < distances[voisin])
-                        {
-                            distances[voisin] = alt;
-                            precedent[voisin] = u;
+                        if (!nonVisites.Contains(voisin)) 
+                        {  
+                            continue; 
                         }
-                    }
+                             
+
+                        int poidsLien = M_Adjacence[N_actuel, voisin];
+                        int distancePotentielle = distances[N_actuel] + poidsLien;
+
+                        if (distancePotentielle  < distances[voisin])
+                        {
+                            distances[voisin] =  distancePotentielle;
+                            precedents[voisin]  = N_actuel;
+                        }
+                    } 
+
                 }
 
-                Console.WriteLine($"\n🔵 Dijkstra : {nomDepart} → {nomArrivee}");
-                Program.AfficherChemin(precedent, depart, arrivee, nomsGares, M_Adjacence);
 
+                Console.WriteLine($"\n[ Dijkstra ]  {nomDepart} -> {nomArrivee}");
+                Program.AfficherChemin( precedents, idDepart, idArrivee, nomsGares, M_Adjacence);
             }
 
-            public void BellmanFordParNom(string nomDepart, string nomArrivee, List<string> nomsGares)
-            {
-                int depart = nomsGares.FindIndex(n => string.Equals(n, nomDepart, StringComparison.OrdinalIgnoreCase)) + 1;
-                int arrivee = nomsGares.FindIndex(n => string.Equals(n, nomArrivee, StringComparison.OrdinalIgnoreCase)) + 1;
 
-                if (depart <= 0 || arrivee <= 0)
+            public void BellmanFord(  string nomDepart, string nomArrivee, List<string> nomsGares)
+            {
+                int idDepart  = nomsGares.FindIndex(n => n.Equals(nomDepart, StringComparison.OrdinalIgnoreCase)) + 1;
+                int idArrivee =  nomsGares.FindIndex(n => n.Equals(nomArrivee, StringComparison.OrdinalIgnoreCase)) + 1;
+
+                if (idDepart <= 0 ||  idArrivee <= 0)
                 {
-                    Console.WriteLine("❌ Gare de départ ou d'arrivée introuvable.");
+                    Console.WriteLine( "Impossible de trouver une des gares.");
                     return;
                 }
 
-                var distances = new Dictionary<int, int>();
-                var precedent = new Dictionary<int, int>();
+                var distances = new  Dictionary<int, int>();
+                var precedents = new  Dictionary<int, int>();
 
-                for (int i = 1; i <= N_Noeuds; i++)
-                    distances[i] = int.MaxValue;
+                // Initalise distances à l 'infini
+                for (int i = 1; i <=  N_Noeuds; i++)
+                    distances[i] =  99999;
 
-                distances[depart] = 0;
+                distances[idDepart] = 0;
 
-                for (int k = 1; k <= N_Noeuds - 1; k++)
+                // Relaxer les arêtes plusieurs fois
+                for (int i = 0; i <  N_Noeuds - 1; i++)
                 {
-                    foreach (var noeud in L_Adjacence)
+                    foreach (var noeud  in L_Adjacence)
                     {
-                        int u = noeud.Numéro;
-                        foreach (var v in noeud.Connexion)
+                        int u =  noeud.Numéro;
+
+                         foreach (var v in noeud.Connexion)
                         {
-                            int poids = M_Adjacence[u, v];
-                            if (distances[u] != int.MaxValue && distances[u] + poids < distances[v])
+                             int poids = M_Adjacence[u, v];
+
+                             if (distances[u] != 99999 && distances[u] + poids < distances[v])
                             {
-                                distances[v] = distances[u] + poids;
-                                precedent[v] = u;
+                                distances[v] =  distances[u] + poids;
+                                precedents[v]  = u;
                             }
                         }
+
                     }
+                    
+
                 }
 
-                foreach (var noeud in L_Adjacence)
+
+                 // Cycle ---- ?
+                foreach (var  noeud in L_Adjacence)
                 {
-                    int u = noeud.Numéro;
-                    foreach (var v in noeud.Connexion)
+                    int u =  noeud.Numéro;
+
+                    foreach (var  v in noeud.Connexion)
                     {
-                        int poids = M_Adjacence[u, v];
-                        if (distances[u] != int.MaxValue && distances[u] + poids < distances[v])
+                        int poids =  M_Adjacence[u, v];
+
+                        if (distances[u]  != 99999 && distances[u] + poids < distances[v])
                         {
-                            Console.WriteLine("⚠️ Cycle de poids négatif détecté !");
-                            return;
+                             Console.WriteLine("Cycle ---.");
+                             return;
+
                         }
                     }
+
                 }
 
-                Console.WriteLine($"\n🟢 Bellman-Ford : {nomDepart} → {nomArrivee}");
-                Program.AfficherChemin(precedent, depart, arrivee, nomsGares, M_Adjacence);
 
+                 Console.WriteLine($"\n[ Bellman-Ford ] {nomDepart} -> {nomArrivee}");
+                Program.AfficherChemin(precedents,  idDepart, idArrivee, nomsGares, M_Adjacence);
             }
-            public void FloydWarshallParNom(string nomDepart, string nomArrivee, List<string> nomsGares)
+
+            public void FloydWarshall( string nomDepart, string nomArrivee, List<string> nomsGares)
             {
-                const int INF = int.MaxValue / 2;
-                int n = N_Noeuds;
+                const int INF = 99999 ;
+                 int n = N_Noeuds;
 
-                int[,] dist = new int[n + 1, n + 1];
-                int[,] suivant = new int[n + 1, n + 1];
-
-                // Initialisation des distances et chemins
-                for (int i = 1; i <= n; i++)
+                 int[,] dist = new int[n + 1, n + 1];
+                 int[,] suivant = new int[n + 1,  n + 1];
+                                 
+                for ( int i = 1; i <= n; i++)
                 {
+                    
                     for (int j = 1; j <= n; j++)
                     {
+                        
                         if (i == j)
                         {
-                            dist[i, j] = 0;
+                            dist[i,  j] = 0;
+                            suivant[i , j] = j;
                         }
-                        else if (M_Adjacence[i, j] > 0)
+                       
+                        else if (M_Adjacence[i,  j] > 0)
                         {
-                            dist[i, j] = M_Adjacence[i, j];
-                            suivant[i, j] = j;
+                            dist[i,  j] = M_Adjacence[i, j];
+                            suivant[ i, j] = j;
                         }
+                       
                         else
                         {
                             dist[i, j] = INF;
@@ -260,69 +290,73 @@ namespace LIP
                     }
                 }
 
-                // Application de l’algorithme
-                for (int k = 1; k <= n; k++)
+             
+                 for (int  k = 1; k <= n; k++)
                 {
-                    for (int i = 1; i <= n; i++)
+
+                    for ( int i = 1; i <= n; i++)
                     {
+
                         for (int j = 1; j <= n; j++)
                         {
-                            if (dist[i, k] + dist[k, j] < dist[i, j])
+
+                            if (dist[ i, k] + dist[k, j] < dist[i, j])
                             {
-                                dist[i, j] = dist[i, k] + dist[k, j];
-                                suivant[i, j] = suivant[i, k];
+                                dist[ i, j] = dist[i, k] + dist[k, j];
+                                suivant[i,  j] = suivant[i, k];
                             }
                         }
                     }
                 }
 
-                // Recherche des indices des gares
-                int depart = nomsGares.FindIndex(nom => string.Equals(nom, nomDepart, StringComparison.OrdinalIgnoreCase)) + 1;
-                int arrivee = nomsGares.FindIndex(nom => string.Equals(nom, nomArrivee, StringComparison.OrdinalIgnoreCase)) + 1;
+                 // Indices des gares
+                int idDepart  = nomsGares.FindIndex(nom => nom.Equals(nomDepart, StringComparison.OrdinalIgnoreCase)) + 1;
+                int idArrivee =  nomsGares.FindIndex(nom => nom.Equals(nomArrivee, StringComparison.OrdinalIgnoreCase)) + 1;
 
-                if (depart <= 0 || arrivee <= 0)
+                if (idDepart <= 0 || idArrivee <= 0 || suivant[idDepart, idArrivee] == -1)
                 {
-                    Console.WriteLine("❌ Gare de départ ou d’arrivée introuvable.");
+                    Console.WriteLine(" Pas de chemin possible entre ces deux gares.");
                     return;
                 }
 
-                if (suivant[depart, arrivee] == -1)
+                 // Fabric chemaiin
+                List<int> chemin =  new List<int> { idDepart };
+                int actuel  = idDepart;
+
+                while (actuel  != idArrivee)
                 {
-                    Console.WriteLine("❌ Aucun chemin trouvé entre ces deux gares.");
-                    return;
+                    actuel =  suivant[actuel, idArrivee];
+                    chemin.Add( actuel);
                 }
 
-                // Reconstruction du chemin
-                List<int> chemin = new List<int> { depart };
-                int u = depart;
-                while (u != arrivee)
-                {
-                    u = suivant[u, arrivee];
-                    chemin.Add(u);
-                }
+                // Affichage 
+                Console.WriteLine($"\n[ Floyd-Warshall ]  {nomDepart} → {nomArrivee}");
+                int poidsTotal  = 0;
 
-                // Affichage
-                Console.WriteLine($"\n🔴 Floyd-Warshall : {nomDepart} → {nomArrivee}");
-                int poidsTotal = 0;
-
-                for (int i = 0; i < chemin.Count; i++)
+                for (int i = 0;  i <  chemin.Count; i++)
                 {
-                    int id = chemin[i];
-                    string nom = nomsGares[id - 1];
-                    Console.Write($"→ {nom}");
+                    int id  = chemin[i];
+                    string nom =  nomsGares[id - 1];
+                     Console.Write($"-> {nom}");
                     if (i < chemin.Count - 1) Console.WriteLine();
 
-                    if (i < chemin.Count - 1)
-                        poidsTotal += M_Adjacence[chemin[i], chemin[i + 1]];
+                    if  (i < chemin.Count - 1)
+                        poidsTotal  = poidsTotal+ M_Adjacence[chemin[i], chemin[i + 1]];
                 }
 
-                Console.WriteLine($"\n🕒 Temps total estimé : {poidsTotal} min");
+                Console.WriteLine($"\nTemps total : {poidsTotal} min");
             }
 
 
 
 
 
+
+            /// <summary>
+            /// génére le graphe
+            /// </summary>
+            /// <param name="chemin"></param>
+            /// <param name="nomsGares"></param>
             public void GenererImageGraphe(string chemin, List<string> nomsGares)
             {
                 int largeur = 3500, hauteur = 3500;
@@ -338,26 +372,26 @@ namespace LIP
                     SKPaint textPaint = new SKPaint
                     {
                         Color = SKColors.Black,
-                        TextSize = 36, // 🟢 texte 2x plus grand
+                        TextSize = 36, 
                         IsAntialias = true
                     };
                     SKPaint weightPaint = new SKPaint
                     {
                         Color = SKColors.Red,
-                        TextSize = 28, // 🟢 poids 2x plus grand
+                        TextSize = 28, 
                         IsAntialias = true
                     };
 
                     if (L_Adjacence.Count == 0)
                     {
-                        Console.WriteLine("❌ Aucun nœud à dessiner.");
+                        Console.WriteLine("Rien à faire");
                         return;
                     }
 
                     Noeud centralNode = L_Adjacence.OrderByDescending(n => n.Connexion.Count).First();
                     List<Noeud> outerNodes = L_Adjacence.Where(n => n != centralNode).ToList();
 
-                    float radiusBase = 40; // 🟢 cercles 2x plus grands
+                    float radiusBase = 40; 
                     float minDistance = 100;
                     Dictionary<int, SKPoint> nodePositions = new Dictionary<int, SKPoint>();
 
@@ -378,26 +412,26 @@ namespace LIP
                         SKPoint pos;
                         do
                         {
-                            float x = (float)(rand.NextDouble() * largeur);
-                            float y = (float)(rand.NextDouble() * hauteur);
+                            float x =  (float)(rand.NextDouble() * largeur);
+                            float y  = (float)(rand.NextDouble() * hauteur);
                             pos = new SKPoint(x, y);
-                        } while (CheckOverlap(pos, radiusBase));
+                        } while  (CheckOverlap(pos, radiusBase));
 
                         nodePositions[node.Numéro] = pos;
                     }
 
                     // Dessin des liens
-                    foreach (var noeud in L_Adjacence)
+                     foreach (var noeud in L_Adjacence)
                     {
                         foreach (var voisin in noeud.Connexion)
                         {
                             if (noeud.Numéro < voisin)
                             {
-                                canvas.DrawLine(nodePositions[noeud.Numéro], nodePositions[voisin], edgePaint);
+                                 canvas.DrawLine(nodePositions[noeud.Numéro], nodePositions[voisin], edgePaint);
 
-                                float midX = (nodePositions[noeud.Numéro].X + nodePositions[voisin].X) / 2;
+                                 float midX = (nodePositions[noeud.Numéro].X + nodePositions[voisin].X) / 2;
                                 float midY = (nodePositions[noeud.Numéro].Y + nodePositions[voisin].Y) / 2;
-                                int poids = M_Adjacence[noeud.Numéro, voisin];
+                                 int poids = M_Adjacence[noeud.Numéro, voisin];
                                 canvas.DrawText(poids.ToString(), midX, midY, weightPaint);
                             }
                         }
@@ -406,57 +440,63 @@ namespace LIP
                     // Dessin des nœuds + texte
                     foreach (var noeud in L_Adjacence)
                     {
-                        float size = Math.Max(radiusBase, 10 + 4 * noeud.Connexion.Count);
-                        var pos = nodePositions[noeud.Numéro];
+                        float size  = Math.Max(radiusBase, 10 + 4 * noeud.Connexion.Count);
+                        var pos =  nodePositions[noeud.Numéro];
                         canvas.DrawCircle(pos, size, nodePaint);
 
-                        string nomGare = (nomsGares != null && noeud.Numéro <= nomsGares.Count)
+                        string nomGare =  (nomsGares != null && noeud.Numéro <= nomsGares.Count)
                             ? nomsGares[noeud.Numéro - 1]
                             : noeud.Numéro.ToString();
 
                         // Centrage amélioré
-                        float offsetX = nomGare.Length * 12;
+                        float offsetX =  nomGare.Length * 12;
                         canvas.DrawText(nomGare, pos.X - offsetX / 2, pos.Y + 12, textPaint);
                     }
 
-                    using (var img = surface.Snapshot())
-                    using (var data = img.Encode(SKEncodedImageFormat.Png, 100))
-                    using (var stream = File.OpenWrite(chemin))
+                    using  (var img = surface.Snapshot())
+                    using  (var data = img.Encode(SKEncodedImageFormat.Png, 100))
+                    using  (var stream = File.OpenWrite(chemin))
                     {
-                        data.SaveTo(stream);
+                         data.SaveTo(stream);
                     }
 
-                    Console.WriteLine("✅ Image sauvegardée !");
+                    Console.WriteLine( "Image enregistré");
                 }
             }
 
 
         }
 
-        // === Lecture Excel ===
+        
+        /// <summary>
+        /// Lis le ficchier et remplis les infos
+        /// </summary>
+        /// <param name="cheminFichier"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
         public static (List<string> nomsGares, List<Program.Lien> liens) ChargerDepuisExcel(string cheminFichier)
         {
             var correspondancesAjoutees = new HashSet<int>();
             var nomsGares = new List<string>();
             var liens = new List<Program.Lien>();
             var nomToId = new Dictionary<string, int>();
-            var liensAjoutes = new HashSet<string>(); // ✅ Pour éviter les doublons
+            var liensAjoutes = new HashSet<string>(); // évite doublons
 
             using (var package = new ExcelPackage(new FileInfo(cheminFichier)))
             {
                 if (package.Workbook.Worksheets.Count == 0)
                     throw new Exception("Le fichier Excel ne contient aucune feuille.");
 
-                var feuille = package.Workbook.Worksheets[1]; // ✅ EPPlus 4.5.3.3 → index 1
+                var feuille = package.Workbook.Worksheets[1]; 
                 int nbLignes = feuille.Dimension.Rows;
 
-                for (int ligne = 2; ligne <= nbLignes; ligne++) // Commencer après l'en-tête
+                for (int ligne = 2; ligne <= nbLignes; ligne++) 
                 {
-                    string nomGare = feuille.Cells[ligne, 2].Text.Trim();     // colonne B
-                    string precedent = feuille.Cells[ligne, 3].Text.Trim();   // colonne C
-                    string suivant = feuille.Cells[ligne, 4].Text.Trim();     // colonne D
-                    string tempsTxt = feuille.Cells[ligne, 5].Text.Trim();    // colonne E
-                    string changement = feuille.Cells[ligne, 6].Text.Trim();  // colonne F
+                    string nomGare =  feuille.Cells[ligne, 2].Text.Trim();     
+                    string precedent  = feuille.Cells[ligne, 3].Text.Trim(); 
+                    string suivant =  feuille.Cells[ligne, 4].Text.Trim();  
+                    string tempsTxt =  feuille.Cells[ligne, 5].Text.Trim();  
+                    string changement =  feuille.Cells[ligne, 6].Text.Trim(); 
 
                     if (string.IsNullOrWhiteSpace(nomGare)) continue;
 
@@ -490,7 +530,7 @@ namespace LIP
 
                         int idDest = nomToId[nomVoisine];
 
-                        // ✅ Clé unique pour empêcher les doublons : A-B ou B-A = même lien
+                        // Evite doublon
                         string cleLien = $"{Math.Min(idGare, idDest)}-{Math.Max(idGare, idDest)}";
 
                         if (!liensAjoutes.Contains(cleLien))
@@ -503,7 +543,7 @@ namespace LIP
                     AjouterLien(precedent);
                     AjouterLien(suivant);
 
-                    // ✅ Temps de changement → auto-lien
+                    // Correspondance
                     if (!string.IsNullOrWhiteSpace(changement) && int.TryParse(changement, out int tChgt) && tChgt > 0)
                     {
                         if (!correspondancesAjoutees.Contains(idGare))
@@ -551,9 +591,9 @@ namespace LIP
             Console.WriteLine("\nMatrice d'adjacence :");
             graphe.Afficher_M_Adjacence();
 
-            graphe.DijkstraParNom("Châtelet", "Place de Clichy", nomsGares);
-            graphe.BellmanFordParNom("Châtelet", "Nation", nomsGares);
-            graphe.FloydWarshallParNom("Châtelet", "Place de Clichy", nomsGares);
+            graphe.Dijkstra("Châtelet", "Place de Clichy", nomsGares);
+            graphe.BellmanFord("Châtelet", "Nation", nomsGares);
+            graphe.FloydWarshall("Châtelet", "Place de Clichy", nomsGares);
 
 
 
