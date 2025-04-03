@@ -230,6 +230,95 @@ namespace LIP
                 Program.AfficherChemin(precedent, depart, arrivee, nomsGares, M_Adjacence);
 
             }
+            public void FloydWarshallParNom(string nomDepart, string nomArrivee, List<string> nomsGares)
+            {
+                const int INF = int.MaxValue / 2;
+                int n = N_Noeuds;
+
+                int[,] dist = new int[n + 1, n + 1];
+                int[,] suivant = new int[n + 1, n + 1];
+
+                // Initialisation des distances et chemins
+                for (int i = 1; i <= n; i++)
+                {
+                    for (int j = 1; j <= n; j++)
+                    {
+                        if (i == j)
+                        {
+                            dist[i, j] = 0;
+                        }
+                        else if (M_Adjacence[i, j] > 0)
+                        {
+                            dist[i, j] = M_Adjacence[i, j];
+                            suivant[i, j] = j;
+                        }
+                        else
+                        {
+                            dist[i, j] = INF;
+                            suivant[i, j] = -1;
+                        }
+                    }
+                }
+
+                // Application de l’algorithme
+                for (int k = 1; k <= n; k++)
+                {
+                    for (int i = 1; i <= n; i++)
+                    {
+                        for (int j = 1; j <= n; j++)
+                        {
+                            if (dist[i, k] + dist[k, j] < dist[i, j])
+                            {
+                                dist[i, j] = dist[i, k] + dist[k, j];
+                                suivant[i, j] = suivant[i, k];
+                            }
+                        }
+                    }
+                }
+
+                // Recherche des indices des gares
+                int depart = nomsGares.FindIndex(nom => string.Equals(nom, nomDepart, StringComparison.OrdinalIgnoreCase)) + 1;
+                int arrivee = nomsGares.FindIndex(nom => string.Equals(nom, nomArrivee, StringComparison.OrdinalIgnoreCase)) + 1;
+
+                if (depart <= 0 || arrivee <= 0)
+                {
+                    Console.WriteLine("❌ Gare de départ ou d’arrivée introuvable.");
+                    return;
+                }
+
+                if (suivant[depart, arrivee] == -1)
+                {
+                    Console.WriteLine("❌ Aucun chemin trouvé entre ces deux gares.");
+                    return;
+                }
+
+                // Reconstruction du chemin
+                List<int> chemin = new List<int> { depart };
+                int u = depart;
+                while (u != arrivee)
+                {
+                    u = suivant[u, arrivee];
+                    chemin.Add(u);
+                }
+
+                // Affichage
+                Console.WriteLine($"\n🔴 Floyd-Warshall : {nomDepart} → {nomArrivee}");
+                int poidsTotal = 0;
+
+                for (int i = 0; i < chemin.Count; i++)
+                {
+                    int id = chemin[i];
+                    string nom = nomsGares[id - 1];
+                    Console.Write($"→ {nom}");
+                    if (i < chemin.Count - 1) Console.WriteLine();
+
+                    if (i < chemin.Count - 1)
+                        poidsTotal += M_Adjacence[chemin[i], chemin[i + 1]];
+                }
+
+                Console.WriteLine($"\n🕒 Temps total estimé : {poidsTotal} min");
+            }
+
 
 
 
@@ -464,6 +553,8 @@ namespace LIP
 
             graphe.DijkstraParNom("Châtelet", "Place de Clichy", nomsGares);
             graphe.BellmanFordParNom("Châtelet", "Nation", nomsGares);
+            graphe.FloydWarshallParNom("Châtelet", "Place de Clichy", nomsGares);
+
 
 
             Console.WriteLine("\nAppuyez sur une touche pour quitter...");
