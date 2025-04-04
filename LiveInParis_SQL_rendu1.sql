@@ -10,7 +10,7 @@ VALUES
 INSERT INTO Cuisinier (idCuisinier, Type, Id)
 VALUES 
     ('CU101', 'Chef', 'U102');
-INSERT INTO Commande (idCommande, idClient_1, Date_Commande, CoutTotal)
+INSERT INTO Commande (idCommande, idClient, Date_Commande, CoutTotal)
 VALUES 
     ('CMD001', 'C101', '2025-01-10', 60),
     ('CMD002', 'C101', '2025-01-10', 30);
@@ -19,7 +19,7 @@ VALUES
     ('PLAT001', FALSE, TRUE, FALSE, 10,'2025-01-10', 10.00, 'France', 'Normal', 'Fromage, pommes de terre, jambon, cornichon', 'Raclette'),
     ('PLAT002', FALSE, FALSE, TRUE, 5, '2025-01-10', 6.00, 'France', 'Végétarien', 'Fraise, kiwi, sucre', 'Salade de fruits');
 
-INSERT INTO LigneDeCommande (idLigneDeCommande, idCommande_1, idPlat_1, Quantité)
+INSERT INTO LigneDeCommande (idLigneDeCommande, idPlat, idCommande, Quantité)
 VALUES 
     ('LDC001', 'CMD001', 'PLAT001', 6),
     ('LDC002', 'CMD002', 'PLAT002', 6);
@@ -32,10 +32,10 @@ VALUES
 INSERT INTO Particulier (idClient, Type)
 VALUES ('C101', 'particulier');
 
-INSERT INTO Livraison (idLivraison, idLigneDeCommande_1, idCuisinier, LieuLivraison)
+INSERT INTO Livraison (idLivraison, idLigneDeCommande, LieuLivraison)
 VALUES 
-    ('LIV3001', 'LDC001', 'C101', '75017, Paris'),
-    ('LIV3002', 'LDC002', 'C101', '75017, Paris');
+    ('LIV3001', 'LDC001',  '75017, Paris'),
+    ('LIV3002', 'LDC002',  '75017, Paris');
 
 INSERT INTO Fait_Retour (idClient, idCuisinier, DateRetour, Commentaire)
 VALUES 
