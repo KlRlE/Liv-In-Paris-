@@ -6,8 +6,10 @@ using System.Linq;
 using OfficeOpenXml;
 using SkiaSharp;
 using System.Data;
-using System.Data.SqlClient;
+//using System.Data.SqlClient;
 using static LIP.Program.Graphe;
+using MySql.Data.MySqlClient;
+
 
 namespace LIP
 {
@@ -31,7 +33,7 @@ namespace LIP
 
                 int pred = precedent[current];
 
-                // si matrice
+                
                 if (matricePoids != null)
                 {
                     poidsTotal += matricePoids[pred, current];
@@ -55,7 +57,7 @@ namespace LIP
                 if (i < chemin.Count - 1) Console.WriteLine();
             }
 
-            // poids total
+            
             if (matricePoids != null)
             {
                 Console.WriteLine($"\n Temps total : {poidsTotal} min");
@@ -110,6 +112,71 @@ namespace LIP
                 }
             }
 
+            public int NombreDeCouleurs()
+            {
+                
+
+                var noeuds = L_Adjacence.OrderByDescending(n => n.Connexion.Count).ToList();
+
+                int[] couleurs = new int[N_Noeuds];
+                for (int i = 0; i < N_Noeuds; i++)
+                {
+                    couleurs[i] = -1; 
+                }
+
+                for (int i = 0; i < N_Noeuds; i++)
+                {
+                    int noeud = noeuds[i].Numéro - 1;
+                    var voisins = L_Adjacence[noeud].Connexion;
+                    var couleursVoisins = voisins.Select(v => couleurs[v - 1]).Where(c => c != -1).ToList();
+
+                    
+                    int couleur = 0;
+                    while (couleursVoisins.Contains(couleur))
+                    {
+                        couleur++;
+                    }
+
+                    couleurs[noeud] = couleur;
+                }
+
+                
+                return couleurs.Distinct().Count();
+            }
+            public bool EstBiparti()
+            {
+                int couleursNecessaires = NombreDeCouleurs();
+                if (couleursNecessaires == 2)
+                {
+                    Console.WriteLine("Biparti n=2");
+                    return true;
+                }
+                else 
+                {
+                    Console.WriteLine("Pas Biparti n!=2");
+                    return false;
+                }
+                
+            }
+
+            
+            public bool EstPlanaire()
+            {
+                int couleursNecessaires = NombreDeCouleurs();
+                if (couleursNecessaires <= 4)
+                {
+                    Console.WriteLine("Planaire n<=4");
+                    return true;
+                }
+                else 
+                {
+                    Console.WriteLine("Pas Planaire n>4");
+                    return false;
+                }
+                
+            }
+
+
             public void Afficher_L_Adjacence()
             {
                 foreach (var noeud in L_Adjacence)
@@ -147,7 +214,7 @@ namespace LIP
                 var precedents =  new Dictionary<int, int>();
                 var nonVisites =  new HashSet<int>();
 
-                // Intitialisation(infini
+                
                 for ( int i = 1; i <= N_Noeuds; i++)
                 {
                     distances[i]  = 99999;
@@ -160,11 +227,11 @@ namespace LIP
                  
                 while (  nonVisites.Count > 0)
                 {
-                    // Noeud plus proche
+                    
                     int N_actuel  = nonVisites.OrderBy(n => distances[n]).First();
                     nonVisites.Remove(N_actuel );
 
-                    //Voisin direct
+                    
                     foreach (var voisin in L_Adjacence[N_actuel - 1].Connexion)
                     {
                         if (!nonVisites.Contains(voisin)) 
@@ -205,13 +272,13 @@ namespace LIP
                 var distances = new  Dictionary<int, int>();
                 var precedents = new  Dictionary<int, int>();
 
-                // Initalise distances à l 'infini
+                
                 for (int i = 1; i <=  N_Noeuds; i++)
                     distances[i] =  99999;
 
                 distances[idDepart] = 0;
 
-                // Relaxer les arêtes plusieurs fois
+                
                 for (int i = 0; i <  N_Noeuds - 1; i++)
                 {
                     foreach (var noeud  in L_Adjacence)
@@ -235,7 +302,7 @@ namespace LIP
                 }
 
 
-                 // Cycle ---- ?
+                 
                 foreach (var  noeud in L_Adjacence)
                 {
                     int u =  noeud.Numéro;
@@ -312,7 +379,7 @@ namespace LIP
                     }
                 }
 
-                 // Indices des gares
+                 
                 int idDepart  = nomsGares.FindIndex(nom => nom.Equals(nomDepart, StringComparison.OrdinalIgnoreCase)) + 1;
                 int idArrivee =  nomsGares.FindIndex(nom => nom.Equals(nomArrivee, StringComparison.OrdinalIgnoreCase)) + 1;
 
@@ -322,7 +389,7 @@ namespace LIP
                     return;
                 }
 
-                 // Fabric chemaiin
+                 
                 List<int> chemin =  new List<int> { idDepart };
                 int actuel  = idDepart;
 
@@ -332,7 +399,7 @@ namespace LIP
                     chemin.Add( actuel);
                 }
 
-                // Affichage 
+               
                 Console.WriteLine($"\n[ Floyd-Warshall ]  {nomDepart} → {nomArrivee}");
                 int poidsTotal  = 0;
 
@@ -470,8 +537,8 @@ namespace LIP
 
             public class Client
             {
-                public string IdClient { get; set; }       // Clé primaire de la table Client
-                public string IdCompte { get; set; }       // Clé étrangère pointant sur Compte
+                public string IdClient { get; set; }       
+                public string IdCompte { get; set; }       
                 public string Nom { get; set; }
                 public string Prenom { get; set; }
                 public int Telephone { get; set; }
@@ -482,11 +549,11 @@ namespace LIP
                 public string Ville { get; set; }
                 public string MetroLePlusProche { get; set; }
                 public bool Rade { get; set; }
-                public string Type { get; set; }           // Par exemple "Particulier" ou "Entreprise_locale"
-                public decimal AchatsCumulés { get; set; }   // Somme des CoutTotal des Commande associées (peut être 0 s'il n'y a aucune commande)
+                public string Type { get; set; }           
+                public decimal AchatsCumulés { get; set; }   
             }
 
-            // Classe assurant la communication avec la base PSI
+            
            
             
             public class ClientRepository
@@ -498,7 +565,7 @@ namespace LIP
                     this.connectionString = connectionString;
                 }
 
-                // Ajoute un client en insérant d'abord dans Compte puis dans Client (dans une transaction)
+                
                 public void AjouterClient(Client client)
                 {
                     string sqlCompte = @"
@@ -509,15 +576,15 @@ VALUES (@Id, @Nom, @Prenom, @Telephone, @AdresseMail, @Numero, @Rue, @CodePostal
 INSERT INTO Client (idClient, Type, Id)
 VALUES (@idClient, @Type, @Id)
 ";
-                    using (SqlConnection conn = new SqlConnection(connectionString))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
                     {
                         conn.Open();
-                        using (SqlTransaction tran = conn.BeginTransaction())
+                        using (MySqlTransaction tran = conn.BeginTransaction())
                         {
                             try
                             {
-                                // Insertion dans Compte
-                                using (SqlCommand cmd = new SqlCommand(sqlCompte, conn, tran))
+                                
+                                using (MySqlCommand cmd = new MySqlCommand(sqlCompte, conn, tran))
                                 {
                                     cmd.Parameters.AddWithValue("@Id", client.IdCompte);
                                     cmd.Parameters.AddWithValue("@Nom", client.Nom);
@@ -533,8 +600,8 @@ VALUES (@idClient, @Type, @Id)
                                     cmd.ExecuteNonQuery();
                                 }
 
-                                // Insertion dans Client
-                                using (SqlCommand cmd = new SqlCommand(sqlClient, conn, tran))
+                                
+                                using (MySqlCommand cmd = new MySqlCommand(sqlClient, conn, tran))
                                 {
                                     cmd.Parameters.AddWithValue("@idClient", client.IdClient);
                                     cmd.Parameters.AddWithValue("@Type", client.Type);
@@ -554,23 +621,23 @@ VALUES (@idClient, @Type, @Id)
                     }
                 }
 
-                // Supprime un client en supprimant d'abord l'enregistrement dans Client puis dans Compte
+                
                 public void SupprimerClient(string idClient)
                 {
-                    // Pour supprimer, on récupère d'abord l'Id (de Compte) associé au Client
+                   
                     string sqlSelectId = "SELECT Id FROM Client WHERE idClient = @idClient";
                     string sqlDeleteClient = "DELETE FROM Client WHERE idClient = @idClient";
                     string sqlDeleteCompte = "DELETE FROM Compte WHERE Id = @Id";
 
-                    using (SqlConnection conn = new SqlConnection(connectionString))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
                     {
                         conn.Open();
-                        using (SqlTransaction tran = conn.BeginTransaction())
+                        using (MySqlTransaction tran = conn.BeginTransaction())
                         {
                             try
                             {
                                 string idCompte = null;
-                                using (SqlCommand cmd = new SqlCommand(sqlSelectId, conn, tran))
+                                using (MySqlCommand cmd = new MySqlCommand(sqlSelectId, conn, tran))
                                 {
                                     cmd.Parameters.AddWithValue("@idClient", idClient);
                                     object result = cmd.ExecuteScalar();
@@ -586,13 +653,13 @@ VALUES (@idClient, @Type, @Id)
                                     return;
                                 }
 
-                                using (SqlCommand cmd = new SqlCommand(sqlDeleteClient, conn, tran))
+                                using (MySqlCommand cmd = new         MySqlCommand(sqlDeleteClient, conn, tran))
                                 {
                                     cmd.Parameters.AddWithValue("@idClient", idClient);
                                     cmd.ExecuteNonQuery();
                                 }
 
-                                using (SqlCommand cmd = new SqlCommand(sqlDeleteCompte, conn, tran))
+                                using (MySqlCommand cmd = new MySqlCommand(sqlDeleteCompte, conn, tran))
                                 {
                                     cmd.Parameters.AddWithValue("@Id", idCompte);
                                     cmd.ExecuteNonQuery();
@@ -610,7 +677,7 @@ VALUES (@idClient, @Type, @Id)
                     }
                 }
 
-                // Modifie un client en mettant à jour Compte et Client
+                
                 public void ModifierClient(Client client)
                 {
                     string sqlUpdateCompte = @"
@@ -632,14 +699,14 @@ UPDATE Client
 SET Type = @Type
 WHERE idClient = @idClient
 ";
-                    using (SqlConnection conn = new SqlConnection(connectionString))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
                     {
                         conn.Open();
-                        using (SqlTransaction tran = conn.BeginTransaction())
+                        using (MySqlTransaction tran = conn.BeginTransaction())
                         {
                             try
                             {
-                                using (SqlCommand cmd = new SqlCommand(sqlUpdateCompte, conn, tran))
+                                using (MySqlCommand cmd = new MySqlCommand(sqlUpdateCompte, conn, tran))
                                 {
                                     cmd.Parameters.AddWithValue("@Nom", client.Nom);
                                     cmd.Parameters.AddWithValue("@Prenom", client.Prenom);
@@ -655,7 +722,7 @@ WHERE idClient = @idClient
                                     cmd.ExecuteNonQuery();
                                 }
 
-                                using (SqlCommand cmd = new SqlCommand(sqlUpdateClient, conn, tran))
+                                using (MySqlCommand cmd = new MySqlCommand(sqlUpdateClient, conn, tran))
                                 {
                                     cmd.Parameters.AddWithValue("@Type", client.Type);
                                     cmd.Parameters.AddWithValue("@idClient", client.IdClient);
@@ -673,8 +740,7 @@ WHERE idClient = @idClient
                     }
                 }
 
-                // Récupère et affiche la liste des clients selon un critère de tri :
-                // "nom" (ordre alphabétique), "rue" (par rue) ou "achats" (clients ayant le plus d'achats cumulés)
+                
                 public List<Client> ObtenirClients(string critereTri)
                 {
                     string orderBy;
@@ -683,14 +749,13 @@ WHERE idClient = @idClient
                     else if (critereTri == "rue")
                         orderBy = "c.rue ASC";
                     else if (critereTri == "achats")
-                        orderBy = "ISNULL(SUM(co.CoutTotal), 0) DESC";
+                        orderBy = "IFNULL(SUM(co.CoutTotal), 0) DESC";
                     else
                         orderBy = "c.nom ASC";
 
-                    // Jointure entre Client et Compte et agrégation avec Commande pour obtenir le total des achats
                     string sql = $@"
 SELECT cl.idClient, c.Id as IdCompte, c.nom, c.prénom, c.téléphone, c.adresse_mail, c.numéro, c.rue, c.Code_Postal, c.Ville, c.MetroLePlusProche, c.Radié, cl.Type,
-       ISNULL(SUM(co.CoutTotal), 0) as AchatsCumulés
+       IFNULL(SUM(co.CoutTotal), 0) as AchatsCumulés
 FROM Client cl
 JOIN Compte c ON cl.Id = c.Id
 LEFT JOIN Commande co ON cl.idClient = co.idClient
@@ -698,11 +763,11 @@ GROUP BY cl.idClient, c.Id, c.nom, c.prénom, c.téléphone, c.adresse_mail, c.n
 ORDER BY {orderBy}
 ";
                     List<Client> liste = new List<Client>();
-                    using (SqlConnection conn = new SqlConnection(connectionString))
-                    using (SqlCommand cmd = new SqlCommand(sql, conn))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
+                    using (MySqlCommand cmd = new MySqlCommand(sql, conn))
                     {
                         conn.Open();
-                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        using (MySqlDataReader reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())
                             {
@@ -731,8 +796,8 @@ ORDER BY {orderBy}
             }
             public class Cuisinier
             {
-                public string IdCuisinier { get; set; }       // Clé primaire de la table Cuisinier
-                public string IdCompte { get; set; }           // Clé étrangère pointant sur Compte
+                public string IdCuisinier { get; set; }      
+                public string IdCompte { get; set; }          
                 public string Nom { get; set; }
                 public string Prenom { get; set; }
                 public int Telephone { get; set; }
@@ -743,10 +808,9 @@ ORDER BY {orderBy}
                 public string Ville { get; set; }
                 public string MetroLePlusProche { get; set; }
                 public bool Radié { get; set; }
-                public string Type { get; set; }               // Par exemple "Cuisinier"
+                public string Type { get; set; }            
             }
 
-            // Repository pour gérer les opérations sur les cuisiniers
             public class CuisinierRepository
             {
                 private readonly string connectionString;
@@ -756,7 +820,7 @@ ORDER BY {orderBy}
                     this.connectionString = connectionString;
                 }
 
-                // Ajoute un cuisinier : insertion dans Compte puis dans Cuisinier
+               
                 public void AjouterCuisinier(Cuisinier c)
                 {
                     string sqlCompte = @"
@@ -767,15 +831,15 @@ VALUES (@Id, @Nom, @Prenom, @Telephone, @AdresseMail, @Numero, @Rue, @CodePostal
 INSERT INTO Cuisinier (idCuisinier, Type, Id)
 VALUES (@idCuisinier, @Type, @Id)
 ";
-                    using (SqlConnection conn = new SqlConnection(connectionString))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
                     {
                         conn.Open();
-                        using (SqlTransaction tran = conn.BeginTransaction())
+                        using (MySqlTransaction tran = conn.BeginTransaction())
                         {
                             try
                             {
-                                // Insertion dans Compte
-                                using (SqlCommand cmd = new SqlCommand(sqlCompte, conn, tran))
+                               
+                                using (MySqlCommand cmd = new MySqlCommand(sqlCompte, conn, tran))
                                 {
                                     cmd.Parameters.AddWithValue("@Id", c.IdCompte);
                                     cmd.Parameters.AddWithValue("@Nom", c.Nom);
@@ -791,8 +855,8 @@ VALUES (@idCuisinier, @Type, @Id)
                                     cmd.ExecuteNonQuery();
                                 }
 
-                                // Insertion dans Cuisinier
-                                using (SqlCommand cmd = new SqlCommand(sqlCuisinier, conn, tran))
+                                
+                                using (MySqlCommand cmd = new MySqlCommand(sqlCuisinier, conn, tran))
                                 {
                                     cmd.Parameters.AddWithValue("@idCuisinier", c.IdCuisinier);
                                     cmd.Parameters.AddWithValue("@Type", c.Type);
@@ -812,7 +876,7 @@ VALUES (@idCuisinier, @Type, @Id)
                     }
                 }
 
-                // Modifie un cuisinier : mise à jour dans Compte et dans Cuisinier
+                
                 public void ModifierCuisinier(Cuisinier c)
                 {
                     string sqlUpdateCompte = @"
@@ -834,14 +898,14 @@ UPDATE Cuisinier
 SET Type = @Type
 WHERE idCuisinier = @idCuisinier
 ";
-                    using (SqlConnection conn = new SqlConnection(connectionString))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
                     {
                         conn.Open();
-                        using (SqlTransaction tran = conn.BeginTransaction())
+                        using (MySqlTransaction tran = conn.BeginTransaction())
                         {
                             try
                             {
-                                using (SqlCommand cmd = new SqlCommand(sqlUpdateCompte, conn, tran))
+                                using (MySqlCommand cmd = new MySqlCommand(sqlUpdateCompte, conn, tran))
                                 {
                                     cmd.Parameters.AddWithValue("@Nom", c.Nom);
                                     cmd.Parameters.AddWithValue("@Prenom", c.Prenom);
@@ -856,7 +920,7 @@ WHERE idCuisinier = @idCuisinier
                                     cmd.Parameters.AddWithValue("@Id", c.IdCompte);
                                     cmd.ExecuteNonQuery();
                                 }
-                                using (SqlCommand cmd = new SqlCommand(sqlUpdateCuisinier, conn, tran))
+                                using (MySqlCommand cmd = new MySqlCommand(sqlUpdateCuisinier, conn, tran))
                                 {
                                     cmd.Parameters.AddWithValue("@Type", c.Type);
                                     cmd.Parameters.AddWithValue("@idCuisinier", c.IdCuisinier);
@@ -874,22 +938,22 @@ WHERE idCuisinier = @idCuisinier
                     }
                 }
 
-                // Supprime un cuisinier : suppression dans Cuisinier puis dans Compte
+                
                 public void SupprimerCuisinier(string idCuisinier)
                 {
                     string sqlSelectId = "SELECT Id FROM Cuisinier WHERE idCuisinier = @idCuisinier";
                     string sqlDeleteCuisinier = "DELETE FROM Cuisinier WHERE idCuisinier = @idCuisinier";
                     string sqlDeleteCompte = "DELETE FROM Compte WHERE Id = @Id";
 
-                    using (SqlConnection conn = new SqlConnection(connectionString))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
                     {
                         conn.Open();
-                        using (SqlTransaction tran = conn.BeginTransaction())
+                        using (MySqlTransaction tran = conn.BeginTransaction())
                         {
                             try
                             {
                                 string idCompte = null;
-                                using (SqlCommand cmd = new SqlCommand(sqlSelectId, conn, tran))
+                                using (MySqlCommand cmd = new MySqlCommand(sqlSelectId, conn, tran))
                                 {
                                     cmd.Parameters.AddWithValue("@idCuisinier", idCuisinier);
                                     object result = cmd.ExecuteScalar();
@@ -901,12 +965,12 @@ WHERE idCuisinier = @idCuisinier
                                     Console.WriteLine("Cuisinier non trouvé.");
                                     return;
                                 }
-                                using (SqlCommand cmd = new SqlCommand(sqlDeleteCuisinier, conn, tran))
+                                using (MySqlCommand cmd = new MySqlCommand(sqlDeleteCuisinier, conn, tran))
                                 {
                                     cmd.Parameters.AddWithValue("@idCuisinier", idCuisinier);
                                     cmd.ExecuteNonQuery();
                                 }
-                                using (SqlCommand cmd = new SqlCommand(sqlDeleteCompte, conn, tran))
+                                using (MySqlCommand cmd = new MySqlCommand(sqlDeleteCompte, conn, tran))
                                 {
                                     cmd.Parameters.AddWithValue("@Id", idCompte);
                                     cmd.ExecuteNonQuery();
@@ -923,7 +987,7 @@ WHERE idCuisinier = @idCuisinier
                     }
                 }
 
-                // Affiche les clients servis par un cuisinier dans une tranche de temps (ou depuis son inscription)
+               
                 public void AfficherClientsServis(string idCuisinier, DateTime? dateDebut = null, DateTime? dateFin = null)
                 {
                     string sql = @"
@@ -945,8 +1009,8 @@ WHERE cu.idCuisinier = @idCuisinier
                     {
                         sql += " AND cmd.Date_Commande <= @dateFin";
                     }
-                    using (SqlConnection conn = new SqlConnection(connectionString))
-                    using (SqlCommand cmd = new SqlCommand(sql, conn))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
+                    using (MySqlCommand cmd = new MySqlCommand(sql, conn))
                     {
                         cmd.Parameters.AddWithValue("@idCuisinier", idCuisinier);
                         if (dateDebut.HasValue)
@@ -954,7 +1018,7 @@ WHERE cu.idCuisinier = @idCuisinier
                         if (dateFin.HasValue)
                             cmd.Parameters.AddWithValue("@dateFin", dateFin.Value);
                         conn.Open();
-                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        using (MySqlDataReader reader = cmd.ExecuteReader())
                         {
                             Console.WriteLine("Clients servis par le cuisinier :");
                             while (reader.Read())
@@ -969,7 +1033,7 @@ WHERE cu.idCuisinier = @idCuisinier
                     }
                 }
 
-                // Affiche les plats réalisés par le cuisinier par fréquence
+                
                 public void AfficherPlatsParFrequence(string idCuisinier)
                 {
                     string sql = @"
@@ -983,12 +1047,12 @@ WHERE cu.idCuisinier = @idCuisinier
 GROUP BY p.idPlat, p.Recette
 ORDER BY Frequency DESC
 ";
-                    using (SqlConnection conn = new SqlConnection(connectionString))
-                    using (SqlCommand cmd = new SqlCommand(sql, conn))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
+                    using (MySqlCommand cmd = new MySqlCommand(sql, conn))
                     {
                         cmd.Parameters.AddWithValue("@idCuisinier", idCuisinier);
                         conn.Open();
-                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        using (MySqlDataReader reader = cmd.ExecuteReader())
                         {
                             Console.WriteLine("Plats réalisés par le cuisinier (par fréquence) :");
                             while (reader.Read())
@@ -1002,7 +1066,7 @@ ORDER BY Frequency DESC
                     }
                 }
 
-                // Affiche le plat du jour proposé par le cuisinier (basé sur les commandes du jour)
+               
                 public void AfficherPlatDuJour(string idCuisinier)
                 {
                     string sql = @"
@@ -1018,12 +1082,12 @@ WHERE cu.idCuisinier = @idCuisinier
 GROUP BY p.idPlat, p.Recette
 ORDER BY Frequency DESC
 ";
-                    using (SqlConnection conn = new SqlConnection(connectionString))
-                    using (SqlCommand cmd = new SqlCommand(sql, conn))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
+                    using (MySqlCommand cmd = new MySqlCommand(sql, conn))
                     {
                         cmd.Parameters.AddWithValue("@idCuisinier", idCuisinier);
                         conn.Open();
-                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        using (MySqlDataReader reader = cmd.ExecuteReader())
                         {
                             Console.WriteLine("Plat du jour proposé par le cuisinier :");
                             if (reader.Read())
@@ -1046,10 +1110,10 @@ ORDER BY Frequency DESC
             {
                 public string IdCommande { get; set; }
                 public DateTime DateCommande { get; set; }
-                public int CoutTotal { get; set; }   // En unité de coût (par exemple, le total du temps en minutes multiplié par un tarif)
+                public int CoutTotal { get; set; }   
                 public string IdClient { get; set; }
-                public int Depart { get; set; }      // Indice (1-based) de la gare de départ
-                public int Arrivee { get; set; }     // Indice de la gare d'arrivée
+                public int Depart { get; set; }      
+                public int Arrivee { get; set; }     
             }
 
             public class BilanRepository
@@ -1060,7 +1124,7 @@ ORDER BY Frequency DESC
                     this.connectionString = connectionString;
                 }
 
-                // 1. Afficher par cuisinier le nombre de livraisons effectuées
+                
                 public void AfficherLivraisonsParCuisinier()
                 {
                     string sql = @"
@@ -1069,11 +1133,11 @@ FROM Cuisinier cu
 JOIN Effectue e ON cu.idCuisinier = e.idCuisinier
 JOIN Livraison l ON e.idLivraison = l.idLivraison
 GROUP BY cu.idCuisinier";
-                    using (SqlConnection conn = new SqlConnection(connectionString))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
                     {
                         conn.Open();
-                        using (SqlCommand cmd = new SqlCommand(sql, conn))
-                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        using (MySqlCommand cmd = new MySqlCommand(sql, conn))
+                        using (MySqlDataReader reader = cmd.ExecuteReader())
                         {
                             Console.WriteLine("Livraisons par cuisinier :");
                             while (reader.Read())
@@ -1086,7 +1150,7 @@ GROUP BY cu.idCuisinier";
                     }
                 }
 
-                // 2. Afficher les commandes selon une période de temps
+                
                 public List<Commande> ObtenirCommandesParPeriode(DateTime? debut, DateTime? fin)
                 {
                     List<Commande> liste = new List<Commande>();
@@ -1095,16 +1159,16 @@ GROUP BY cu.idCuisinier";
                         sql += " AND Date_Commande >= @debut";
                     if (fin.HasValue)
                         sql += " AND Date_Commande <= @fin";
-                    using (SqlConnection conn = new SqlConnection(connectionString))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
                     {
                         conn.Open();
-                        using (SqlCommand cmd = new SqlCommand(sql, conn))
+                        using (MySqlCommand cmd = new MySqlCommand(sql, conn))
                         {
                             if (debut.HasValue)
                                 cmd.Parameters.AddWithValue("@debut", debut.Value);
                             if (fin.HasValue)
                                 cmd.Parameters.AddWithValue("@fin", fin.Value);
-                            using (SqlDataReader reader = cmd.ExecuteReader())
+                            using (MySqlDataReader reader = cmd.ExecuteReader())
                             {
                                 while (reader.Read())
                                 {
@@ -1123,14 +1187,14 @@ GROUP BY cu.idCuisinier";
                     return liste;
                 }
 
-                // 3. Afficher la moyenne des prix des commandes
+                
                 public double CalculerMoyennePrixCommandes()
                 {
                     string sql = "SELECT AVG(CAST(CoutTotal AS FLOAT)) FROM Commande";
-                    using (SqlConnection conn = new SqlConnection(connectionString))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
                     {
                         conn.Open();
-                        using (SqlCommand cmd = new SqlCommand(sql, conn))
+                        using (MySqlCommand cmd = new MySqlCommand(sql, conn))
                         {
                             object result = cmd.ExecuteScalar();
                             return (result != DBNull.Value) ? Convert.ToDouble(result) : 0;
@@ -1138,20 +1202,19 @@ GROUP BY cu.idCuisinier";
                     }
                 }
 
-                // 4. Afficher la moyenne des achats des clients
-                // On calcule la somme des commandes par client et on en fait la moyenne.
+               
                 public double CalculerMoyenneAchatsClients()
                 {
                     string sql = @"
 SELECT AVG(TotalAchats) FROM (
-    SELECT ISNULL(SUM(CoutTotal), 0) AS TotalAchats
+    SELECT IFNULL(SUM(CoutTotal), 0) AS TotalAchats
     FROM Commande
     GROUP BY idClient
 ) as Achats";
-                    using (SqlConnection conn = new SqlConnection(connectionString))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
                     {
                         conn.Open();
-                        using (SqlCommand cmd = new SqlCommand(sql, conn))
+                        using (MySqlCommand cmd = new MySqlCommand(sql, conn))
                         {
                             object result = cmd.ExecuteScalar();
                             return (result != DBNull.Value) ? Convert.ToDouble(result) : 0;
@@ -1159,7 +1222,7 @@ SELECT AVG(TotalAchats) FROM (
                     }
                 }
 
-                // 5. Afficher la liste des commandes pour un client selon la nationalité des plats et une période
+               
                 public void AfficherCommandesPourClient(string idClient, string pays, DateTime? debut, DateTime? fin)
                 {
                     string sql = @"
@@ -1174,10 +1237,10 @@ WHERE cmd.idClient = @idClient";
                         sql += " AND cmd.Date_Commande >= @debut";
                     if (fin.HasValue)
                         sql += " AND cmd.Date_Commande <= @fin";
-                    using (SqlConnection conn = new SqlConnection(connectionString))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
                     {
                         conn.Open();
-                        using (SqlCommand cmd = new SqlCommand(sql, conn))
+                        using (MySqlCommand cmd = new MySqlCommand(sql, conn))
                         {
                             cmd.Parameters.AddWithValue("@idClient", idClient);
                             if (!string.IsNullOrEmpty(pays))
@@ -1186,7 +1249,7 @@ WHERE cmd.idClient = @idClient";
                                 cmd.Parameters.AddWithValue("@debut", debut.Value);
                             if (fin.HasValue)
                                 cmd.Parameters.AddWithValue("@fin", fin.Value);
-                            using (SqlDataReader reader = cmd.ExecuteReader())
+                            using (MySqlDataReader reader = cmd.ExecuteReader())
                             {
                                 Console.WriteLine($"Commandes pour le client {idClient} (Pays des plats = {pays}, Période = {debut?.ToShortDateString()} - {fin?.ToShortDateString()}) :");
                                 while (reader.Read())
@@ -1203,7 +1266,7 @@ WHERE cmd.idClient = @idClient";
                 }
             }
 
-            // Repository pour gérer les commandes dans la base PSI (table Commande)
+          
             public class CommandeRepository
             {
                 private readonly string connectionString;
@@ -1216,10 +1279,10 @@ WHERE cmd.idClient = @idClient";
                     string sql = @"
 INSERT INTO Commande (idCommande, Date_Commande, CoutTotal, idClient)
 VALUES (@idCommande, @DateCommande, @CoutTotal, @idClient)";
-                    using (SqlConnection conn = new SqlConnection(connectionString))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
                     {
                         conn.Open();
-                        using (SqlCommand command = new SqlCommand(sql, conn))
+                        using (MySqlCommand command = new MySqlCommand(sql, conn))
                         {
                             command.Parameters.AddWithValue("@idCommande", cmd.IdCommande);
                             command.Parameters.AddWithValue("@DateCommande", cmd.DateCommande);
@@ -1236,10 +1299,10 @@ VALUES (@idCommande, @DateCommande, @CoutTotal, @idClient)";
 UPDATE Commande
 SET Date_Commande = @DateCommande, CoutTotal = @CoutTotal, idClient = @idClient
 WHERE idCommande = @idCommande";
-                    using (SqlConnection conn = new SqlConnection(connectionString))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
                     {
                         conn.Open();
-                        using (SqlCommand command = new SqlCommand(sql, conn))
+                        using (MySqlCommand command = new MySqlCommand(sql, conn))
                         {
                             command.Parameters.AddWithValue("@idCommande", cmd.IdCommande);
                             command.Parameters.AddWithValue("@DateCommande", cmd.DateCommande);
@@ -1253,13 +1316,13 @@ WHERE idCommande = @idCommande";
                 public Commande ObtenirCommande(string idCommande)
                 {
                     string sql = "SELECT idCommande, Date_Commande, CoutTotal, idClient FROM Commande WHERE idCommande = @idCommande";
-                    using (SqlConnection conn = new SqlConnection(connectionString))
+                    using (MySqlConnection conn = new MySqlConnection(connectionString))
                     {
                         conn.Open();
-                        using (SqlCommand command = new SqlCommand(sql, conn))
+                        using (MySqlCommand command = new MySqlCommand(sql, conn))
                         {
                             command.Parameters.AddWithValue("@idCommande", idCommande);
-                            using (SqlDataReader reader = command.ExecuteReader())
+                            using (MySqlDataReader reader = command.ExecuteReader())
                             {
                                 if (reader.Read())
                                 {
@@ -1292,7 +1355,7 @@ WHERE idCommande = @idCommande";
             var nomsGares = new List<string>();
             var liens = new List<Program.Lien>();
             var nomToId = new Dictionary<string, int>();
-            var liensAjoutes = new HashSet<string>(); // évite doublons
+            var liensAjoutes = new HashSet<string>(); 
 
             using (var package = new ExcelPackage(new FileInfo(cheminFichier)))
             {
@@ -1330,7 +1393,7 @@ WHERE idCommande = @idCommande";
 
                         if (numVoisine < 1 || numVoisine + 1 > nbLignes) return;
 
-                        string nomVoisine = feuille.Cells[numVoisine + 1, 2].Text.Trim(); // Excel commence à ligne 2
+                        string nomVoisine = feuille.Cells[numVoisine + 1, 2].Text.Trim(); 
 
                         if (string.IsNullOrWhiteSpace(nomVoisine)) return;
 
@@ -1342,7 +1405,7 @@ WHERE idCommande = @idCommande";
 
                         int idDest = nomToId[nomVoisine];
 
-                        // Evite doublon
+                        
                         string cleLien = $"{Math.Min(idGare, idDest)}-{Math.Max(idGare, idDest)}";
 
                         if (!liensAjoutes.Contains(cleLien))
@@ -1355,7 +1418,7 @@ WHERE idCommande = @idCommande";
                     AjouterLien(precedent);
                     AjouterLien(suivant);
 
-                    // Correspondance
+                    
                     if (!string.IsNullOrWhiteSpace(changement) && int.TryParse(changement, out int tChgt) && tChgt > 0)
                     {
                         if (!correspondancesAjoutees.Contains(idGare))
@@ -1394,9 +1457,18 @@ WHERE idCommande = @idCommande";
             Console.WriteLine($"\nNombre de gares : {nomsGares.Count}");
             Console.WriteLine($"Nombre de liens : {liens.Count}");
             Console.WriteLine($"Nombre de noeuds dans le graphe : {graphe.L_Adjacence.Count}");
+                var couleurs = graphe.NombreDeCouleurs();
+                Console.WriteLine("Nombre couleurs= "+couleurs);
+
+               
+                Console.WriteLine("Le graphe est biparti : " + graphe.EstBiparti());
+
+                
+                Console.WriteLine("Le graphe est planaire : " + graphe.EstPlanaire());
 
 
-            string imagePath = "reseau_gares.png";
+
+                string imagePath = "reseau_gares.png";
             graphe.GenererImageGraphe(imagePath, nomsGares);
             Console.WriteLine($"\nImage générée : {imagePath}");
 
@@ -1407,11 +1479,28 @@ WHERE idCommande = @idCommande";
             graphe.BellmanFord("Châtelet", "Nation", nomsGares);
             graphe.FloydWarshall("Châtelet", "Place de Clichy", nomsGares);
 
-                // Adaptez cette chaîne de connexion à votre environnement PSI
-                //string connectionString = "SERVER=localhost;PORT=3306;DATABASE=LivInParis;UID=root;PASSWORD=";
-                //string connectionString = "SERVER=127.0.0.1:3306;DATABASE=LivInParis;UID=root;PASSWORD=Gaabi.a3";
-                string connectionString = "SERVER=127.0.0.1;DATABASE=test2;UID=root;PASSWORD=test";
-                //string connectionString = "SERVER=localhost;PORT=3306;DATABASE=Live_In_Paris;UID=root;PASSWORD=Gaabi.a3";
+                
+                string connectionString =
+               "Server=127.0.0.1;" +  
+               "Port=3306;" +  
+               "Database=PSI;" +
+               "Uid=root;" +
+               "Pwd=Gaabi.a3;";
+
+
+                using (var connection = new MySqlConnection(connectionString))
+                {
+                    connection.Open();
+                    Console.WriteLine("Connexion réussie !");
+                    
+                }
+              
+
+
+
+
+
+
                 ClientRepository repo = new ClientRepository(connectionString);
 
             bool exit = false;
@@ -1522,7 +1611,7 @@ WHERE idCommande = @idCommande";
                 }
             }
 
-                // Gestion des Cuisiniers
+                
                 CuisinierRepository cuisinierRepo = new CuisinierRepository(connectionString);
                 bool exitCuisiniers = false;
                 while (!exitCuisiniers)
@@ -1667,7 +1756,7 @@ WHERE idCommande = @idCommande";
                     switch (choixCmd)
                     {
                         case "1":
-                            // Création d'une nouvelle commande
+                            
                             Commande nouvelleCmd = new Commande();
                             Console.Write("Numéro de commande (unique) : ");
                             nouvelleCmd.IdCommande = Console.ReadLine();
@@ -1694,10 +1783,10 @@ WHERE idCommande = @idCommande";
                                 Console.Write("Valeur invalide. Réessayez : ");
                             }
                             nouvelleCmd.Arrivee = arr;
-                            // Utilisation de Dijkstra pour afficher le trajet
+                            
                             Console.WriteLine("Chemin de livraison calculé (via Dijkstra) :");
                             graphe.Dijkstra(nomsGares[dep - 1], nomsGares[arr - 1], nomsGares);
-                            // Ici, le coût est affiché par Dijkstra (le temps total). On le sauvegarde dans la commande.
+                            
                             Console.Write("Indiquez le coût (tel qu'affiché par Dijkstra) : ");
                             int cout;
                             while (!int.TryParse(Console.ReadLine(), out cout))
@@ -1708,7 +1797,7 @@ WHERE idCommande = @idCommande";
                             commandeRepo.AjouterCommande(nouvelleCmd);
                             break;
                         case "2":
-                            // Modification d'une commande existante
+                            
                             Console.Write("Numéro de commande à modifier : ");
                             string idModif = Console.ReadLine();
                             Commande cmdModif = commandeRepo.ObtenirCommande(idModif);
@@ -1750,7 +1839,7 @@ WHERE idCommande = @idCommande";
                             commandeRepo.ModifierCommande(cmdModif);
                             break;
                         case "3":
-                            // Afficher le prix d'une commande à partir de son numéro
+                            
                             Console.Write("Numéro de commande : ");
                             string idPrix = Console.ReadLine();
                             Commande cmdPrix = commandeRepo.ObtenirCommande(idPrix);
@@ -1760,7 +1849,7 @@ WHERE idCommande = @idCommande";
                                 Console.WriteLine($"Le prix de la commande {cmdPrix.IdCommande} est de {cmdPrix.CoutTotal}");
                             break;
                         case "4":
-                            // Afficher le chemin de livraison (via Dijkstra) pour une commande
+                            
                             Console.Write("Numéro de commande : ");
                             string idChemin = Console.ReadLine();
                             Commande cmdChemin = commandeRepo.ObtenirCommande(idChemin);
