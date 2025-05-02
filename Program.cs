@@ -143,6 +143,46 @@ namespace LIP
                 
                 return couleurs.Distinct().Count();
             }
+
+            // Dictionnaire : clé = Numéro du nœud (1‑based), valeur = indice de couleur (0,1,2…)
+            public Dictionary<int, int> AssocierCouleurs()
+            {
+                // 1. Ordonne les nœuds du plus haut au plus faible degré (heuristique gloutonne)
+                var noeuds = L_Adjacence
+                             .OrderByDescending(n => n.Connexion.Count)
+                             .ToList();
+
+                // 2. Tableau temporaire des couleurs (–1 = non colorié)
+                int[] couleurs = Enumerable.Repeat(-1, N_Noeuds).ToArray();
+
+                // 3. Parcours des nœuds dans l’ordre choisi
+                foreach (var n in noeuds)
+                {
+                    int indexNoeud = n.Numéro - 1;                     // Passe à 0‑based
+                    var voisins = L_Adjacence[indexNoeud].Connexion;
+
+                    // Couleurs déjà prises par les voisins
+                    var couleursVoisins = voisins
+                                          .Select(v => couleurs[v - 1])
+                                          .Where(c => c != -1)
+                                          .ToHashSet();                // HashSet = Contains O(1)
+
+                    // 4. Choisit la première couleur libre
+                    int couleur = 0;
+                    while (couleursVoisins.Contains(couleur))
+                        couleur++;
+
+                    couleurs[indexNoeud] = couleur;                    // Attribue
+                }
+
+                // 5. Transforme le tableau en dictionnaire (clé = nœud, valeur = couleur)
+                var resultat = Enumerable.Range(0, N_Noeuds)
+                                         .ToDictionary(i => i + 1,   // remet en 1‑based
+                                                       i => couleurs[i]);
+
+                return resultat;
+            }
+
             public bool EstBiparti()
             {
                 int couleursNecessaires = NombreDeCouleurs();
@@ -419,7 +459,130 @@ namespace LIP
 
 
 
+            public class StatistiquesRepository
+            {
+                private readonly string connectionString;
 
+                public StatistiquesRepository(string connectionString)
+                {
+                    this.connectionString = connectionString;
+                }
+
+                // 1. Cuisiniers avec plus de livraisons que la moyenne
+                public void AfficherCuisiniersAuDessusDeLaMoyenne()
+                {
+                    string sql = @"
+SELECT cu.idCuisinier, COUNT(DISTINCT l.idLivraison) AS NombreLivraisons
+FROM Cuisinier cu
+JOIN Effectue e ON cu.idCuisinier = e.idCuisinier
+JOIN Livraison l ON e.idLivraison = l.idLivraison
+GROUP BY cu.idCuisinier
+HAVING COUNT(DISTINCT l.idLivraison) > (
+    SELECT AVG(Nombre)
+    FROM (
+        SELECT COUNT(DISTINCT l.idLivraison) AS Nombre
+        FROM Cuisinier cu
+        JOIN Effectue e ON cu.idCuisinier = e.idCuisinier
+        JOIN Livraison l ON e.idLivraison = l.idLivraison
+        GROUP BY cu.idCuisinier
+    ) AS Moyennes
+)";
+                    using var conn = new MySqlConnection(connectionString);
+                    using var cmd = new MySqlCommand(sql, conn);
+                    conn.Open();
+                    using var reader = cmd.ExecuteReader();
+                    Console.WriteLine("Cuisiniers avec plus de livraisons que la moyenne :");
+                    while (reader.Read())
+                    {
+                        Console.WriteLine($"Cuisinier {reader.GetString(0)} - {reader.GetInt32(1)} livraisons");
+                    }
+                }
+
+                // 2. Clients sans aucune commande
+                public void AfficherClientsSansCommandes()
+                {
+                    string sql = @"
+SELECT c.Id, c.nom, c.prénom
+FROM Compte c
+JOIN Client cl ON cl.Id = c.Id
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM Commande cmd
+    WHERE cmd.idClient = cl.idClient
+)";
+                    using var conn = new MySqlConnection(connectionString);
+                    using var cmd = new MySqlCommand(sql, conn);
+                    conn.Open();
+                    using var reader = cmd.ExecuteReader();
+                    Console.WriteLine("Clients n'ayant jamais passé de commande :");
+                    while (reader.Read())
+                    {
+                        Console.WriteLine($"Client {reader.GetString(1)} {reader.GetString(2)} (ID Compte: {reader.GetString(0)})");
+                    }
+                }
+
+                // 3. Plats les plus chers de leur pays (ALL)
+                public void AfficherPlatsLesPlusChersParPays()
+                {
+                    string sql = @"
+SELECT p1.idPlat, p1.Recette, p1.Prix, p1.PaysOrigine
+FROM Plat p1
+WHERE p1.Prix > ALL (
+    SELECT p2.Prix
+    FROM Plat p2
+    WHERE p2.PaysOrigine = p1.PaysOrigine
+      AND p2.idPlat <> p1.idPlat
+)";
+                    using var conn = new MySqlConnection(connectionString);
+                    using var cmd = new MySqlCommand(sql, conn);
+                    conn.Open();
+                    using var reader = cmd.ExecuteReader();
+                    Console.WriteLine("Plats les plus chers par pays :");
+                    while (reader.Read())
+                    {
+                        Console.WriteLine($"Plat: {reader.GetString(1)} - {reader.GetDouble(2)}€ ({reader.GetString(3)})");
+                    }
+                }
+
+                // 4. Clients avec au moins une commande > 100€
+                public void AfficherClientsAvecCommandesHautPrix()
+                {
+                    string sql = @"
+SELECT DISTINCT cl.idClient, c.nom, c.prénom
+FROM Commande cmd
+JOIN Client cl ON cl.idClient = cmd.idClient
+JOIN Compte c ON cl.Id = c.Id
+WHERE cmd.CoutTotal > ANY (SELECT 100)";
+                    using var conn = new MySqlConnection(connectionString);
+                    using var cmd = new MySqlCommand(sql, conn);
+                    conn.Open();
+                    using var reader = cmd.ExecuteReader();
+                    Console.WriteLine("Clients ayant commandé au moins une fois pour plus de 100€ :");
+                    while (reader.Read())
+                    {
+                        Console.WriteLine($"Client: {reader.GetString(1)} {reader.GetString(2)} - ID: {reader.GetString(0)}");
+                    }
+                }
+
+                // 5. Plats jamais commandés
+                public void AfficherPlatsJamaisCommandés()
+                {
+                    string sql = @"
+SELECT p.idPlat, p.Recette
+FROM Plat p
+LEFT JOIN LigneDeCommande ldc ON p.idPlat = ldc.idPlat
+WHERE ldc.idPlat IS NULL";
+                    using var conn = new MySqlConnection(connectionString);
+                    using var cmd = new MySqlCommand(sql, conn);
+                    conn.Open();
+                    using var reader = cmd.ExecuteReader();
+                    Console.WriteLine("Plats jamais commandés :");
+                    while (reader.Read())
+                    {
+                        Console.WriteLine($"Plat: {reader.GetString(1)} - ID: {reader.GetString(0)}");
+                    }
+                }
+            }
 
 
             /// <summary>
@@ -427,111 +590,95 @@ namespace LIP
             /// </summary>
             /// <param name="chemin"></param>
             /// <param name="nomsGares"></param>
-            public void GenererImageGraphe(string chemin, List<string> nomsGares)
+            public void GenererImageGraphe(string chemin, List<string>? nomsGares = null)
             {
-                int largeur = 3500, hauteur = 3500;
-                Random rand = new Random();
+                const int W = 4500, H = 4500;
+                Random rnd = new();
 
-                using (var surface = SKSurface.Create(new SKImageInfo(largeur, hauteur)))
+                // Palette de 10 couleurs, extensible
+                List<SKColor> palette = new()
+        {
+            SKColors.Blue, SKColors.Red,   SKColors.Green,  SKColors.Orange,
+            SKColors.Purple, SKColors.Brown, SKColors.Cyan, SKColors.Magenta,
+            SKColors.Yellow, SKColors.Lime
+        };
+
+                var couleurParNoeud = AssocierCouleurs();
+
+                using var surface = SKSurface.Create(new SKImageInfo(W, H));
+                var canvas = surface.Canvas;
+                canvas.Clear(SKColors.White);
+
+                SKPaint edgePaint = new() { Color = SKColors.Black, StrokeWidth = 2 };
+                SKPaint nodePaint = new() { StrokeWidth = 2 };
+                SKPaint textPaint = new() { Color = SKColors.Black, TextSize = 36, IsAntialias = true };
+                SKPaint weightPaint = new() { Color = SKColors.Red, TextSize = 28, IsAntialias = true };
+
+                if (L_Adjacence.Count == 0) return;
+
+                // Placement : barycentre = nœud de plus fort degré
+                Noeud centre = L_Adjacence.OrderByDescending(n => n.Connexion.Count).First();
+                var periph = L_Adjacence.Where(n => n != centre).ToList();
+
+                const float rBase = 40;
+                const float minDist = 100;
+                Dictionary<int, SKPoint> pos = new() { [centre.Numéro] = new SKPoint(W / 2f, H / 2f) };
+
+                bool Overlap(SKPoint p)
                 {
-                    var canvas = surface.Canvas;
-                    canvas.Clear(SKColors.White);
-
-                    SKPaint edgePaint = new SKPaint { Color = SKColors.Black, StrokeWidth = 2 };
-                    SKPaint nodePaint = new SKPaint { Color = SKColors.Blue, StrokeWidth = 2 };
-                    SKPaint textPaint = new SKPaint
-                    {
-                        Color = SKColors.Black,
-                        TextSize = 36, 
-                        IsAntialias = true
-                    };
-                    SKPaint weightPaint = new SKPaint
-                    {
-                        Color = SKColors.Red,
-                        TextSize = 28, 
-                        IsAntialias = true
-                    };
-
-                    if (L_Adjacence.Count == 0)
-                    {
-                        Console.WriteLine("Rien à faire");
-                        return;
-                    }
-
-                    Noeud centralNode = L_Adjacence.OrderByDescending(n => n.Connexion.Count).First();
-                    List<Noeud> outerNodes = L_Adjacence.Where(n => n != centralNode).ToList();
-
-                    float radiusBase = 40; 
-                    float minDistance = 100;
-                    Dictionary<int, SKPoint> nodePositions = new Dictionary<int, SKPoint>();
-
-                    nodePositions[centralNode.Numéro] = new SKPoint(largeur / 2f, hauteur / 2f);
-
-                    bool CheckOverlap(SKPoint newPos, float radius)
-                    {
-                        foreach (var pos in nodePositions.Values)
-                        {
-                            float dist = (float)Math.Sqrt(Math.Pow(newPos.X - pos.X, 2) + Math.Pow(newPos.Y - pos.Y, 2));
-                            if (dist < radius + minDistance) return true;
-                        }
-                        return false;
-                    }
-
-                    foreach (var node in outerNodes)
-                    {
-                        SKPoint pos;
-                        do
-                        {
-                            float x =  (float)(rand.NextDouble() * largeur);
-                            float y  = (float)(rand.NextDouble() * hauteur);
-                            pos = new SKPoint(x, y);
-                        } while  (CheckOverlap(pos, radiusBase));
-
-                        nodePositions[node.Numéro] = pos;
-                    }
-
-                    // Dessin des liens
-                     foreach (var noeud in L_Adjacence)
-                    {
-                        foreach (var voisin in noeud.Connexion)
-                        {
-                            if (noeud.Numéro < voisin)
-                            {
-                                 canvas.DrawLine(nodePositions[noeud.Numéro], nodePositions[voisin], edgePaint);
-
-                                 float midX = (nodePositions[noeud.Numéro].X + nodePositions[voisin].X) / 2;
-                                float midY = (nodePositions[noeud.Numéro].Y + nodePositions[voisin].Y) / 2;
-                                 int poids = M_Adjacence[noeud.Numéro, voisin];
-                                canvas.DrawText(poids.ToString(), midX, midY, weightPaint);
-                            }
-                        }
-                    }
-
-                    // Dessin des nœuds + texte
-                    foreach (var noeud in L_Adjacence)
-                    {
-                        float size  = Math.Max(radiusBase, 10 + 4 * noeud.Connexion.Count);
-                        var pos =  nodePositions[noeud.Numéro];
-                        canvas.DrawCircle(pos, size, nodePaint);
-
-                        string nomGare =  (nomsGares != null && noeud.Numéro <= nomsGares.Count)
-                            ? nomsGares[noeud.Numéro - 1]
-                            : noeud.Numéro.ToString();
-
-                        // Centrage amélioré
-                        float offsetX =  nomGare.Length * 12;
-                        canvas.DrawText(nomGare, pos.X - offsetX / 2, pos.Y + 12, textPaint);
-                    }
-
-                    using  (var img = surface.Snapshot())
-                    using  (var data = img.Encode(SKEncodedImageFormat.Png, 100))
-                    using  (var stream = File.OpenWrite(chemin))
-                    {
-                         data.SaveTo(stream);
-                    }
-
-                    Console.WriteLine( "Image enregistré");
+                    foreach (var q in pos.Values)
+                        if (((p.X - q.X) * (p.X - q.X) + (p.Y - q.Y) * (p.Y - q.Y)) < (rBase + minDist) * (rBase + minDist))
+                            return true;
+                    return false;
                 }
+
+                foreach (var n in periph)
+                {
+                    SKPoint p;
+                    do { p = new SKPoint((float)(rnd.NextDouble() * W), (float)(rnd.NextDouble() * H)); }
+                    while (Overlap(p));
+
+                    pos[n.Numéro] = p;
+                }
+
+                // Arêtes + poids
+                foreach (var a in L_Adjacence)
+                    foreach (var b in a.Connexion.Where(v => a.Numéro < v))
+                    {
+                        canvas.DrawLine(pos[a.Numéro], pos[b], edgePaint);
+
+                        float midX = (pos[a.Numéro].X + pos[b].X) / 2;
+                        float midY = (pos[a.Numéro].Y + pos[b].Y) / 2;
+                        canvas.DrawText(M_Adjacence[a.Numéro, b].ToString(), midX, midY, weightPaint);
+                    }
+
+                // Sommets + libellés
+                foreach (var n in L_Adjacence)
+                {
+                    float size = Math.Max(rBase, 10 + 4 * n.Connexion.Count);
+                    SKPoint p = pos[n.Numéro];
+
+                    int idx = couleurParNoeud[n.Numéro];
+                    nodePaint.Color = idx < palette.Count
+                                      ? palette[idx]
+                                      : SKColor.FromHsv((idx * 37) % 360, 80, 90); // teinte HSV si palette dépassée
+
+                    canvas.DrawCircle(p, size, nodePaint);
+
+                    string libelle = (nomsGares != null && n.Numéro <= nomsGares.Count && nomsGares[n.Numéro - 1] != null)
+                                     ? nomsGares[n.Numéro - 1]
+                                     : n.Numéro.ToString();
+
+                    canvas.DrawText(libelle,
+                                    p.X - libelle.Length * 12 / 2f,
+                                    p.Y + 12,
+                                    textPaint);
+                }
+
+                using var img = surface.Snapshot();
+                using var data = img.Encode(SKEncodedImageFormat.Png, 100);
+                using var file = File.OpenWrite(chemin);
+                data.SaveTo(file);
             }
 
 
@@ -1612,7 +1759,8 @@ WHERE idCommande = @idCommande";
             }
 
                 
-                CuisinierRepository cuisinierRepo = new CuisinierRepository(connectionString);
+
+                    CuisinierRepository cuisinierRepo = new CuisinierRepository(connectionString);
                 bool exitCuisiniers = false;
                 while (!exitCuisiniers)
                 {
@@ -1929,6 +2077,45 @@ WHERE idCommande = @idCommande";
                             break;
                         case "0":
                             exitBilans = true;
+                            break;
+                        default:
+                            Console.WriteLine("Option non reconnue.");
+                            break;
+                    }
+                }
+
+                StatistiquesRepository statsRepo = new StatistiquesRepository(connectionString);
+                bool exitStats = false;
+                while (!exitStats)
+                {
+                    Console.WriteLine("\n--- Statistiques globales ---");
+                    Console.WriteLine("1. Cuisiniers au‑dessus de la moyenne de livraisons");
+                    Console.WriteLine("2. Clients sans aucune commande");
+                    Console.WriteLine("3. Plats les plus chers de leur pays");
+                    Console.WriteLine("4. Clients ayant au moins une commande > 100€");
+                    Console.WriteLine("5. Plats jamais commandés");
+                    Console.WriteLine("0. Retour");
+                    Console.Write("Votre choix : ");
+                    string choixStats = Console.ReadLine();
+                    switch (choixStats)
+                    {
+                        case "1":
+                            statsRepo.AfficherCuisiniersAuDessusDeLaMoyenne();
+                            break;
+                        case "2":
+                            statsRepo.AfficherClientsSansCommandes();
+                            break;
+                        case "3":
+                            statsRepo.AfficherPlatsLesPlusChersParPays();
+                            break;
+                        case "4":
+                            statsRepo.AfficherClientsAvecCommandesHautPrix();
+                            break;
+                        case "5":
+                            statsRepo.AfficherPlatsJamaisCommandés();
+                            break;
+                        case "0":
+                            exitStats = true;
                             break;
                         default:
                             Console.WriteLine("Option non reconnue.");
