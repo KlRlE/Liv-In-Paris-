@@ -9,12 +9,52 @@ using System.Data;
 //using System.Data.SqlClient;
 using static LIP.Program.Graphe;
 using MySql.Data.MySqlClient;
-
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Xml.Serialization;
+using System.Text.Encodings.Web;
 
 namespace LIP
 {
     internal class Program
     {
+
+        public static class XmlHelper
+        {
+            public static void Save<T>(IEnumerable<T> items, string path)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+                var xs = new XmlSerializer(typeof(List<T>));
+                using var fs = File.Create(path);
+                xs.Serialize(fs, items.ToList());
+            }
+
+            public static List<T> Load<T>(string path)
+            {
+                var xs = new XmlSerializer(typeof(List<T>));
+                using var fs = File.OpenRead(path);
+                return (List<T>)xs.Deserialize(fs)!;
+            }
+        }
+        public static class JsonHelper
+        {
+            private static readonly JsonSerializerOptions Opts = new()
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping  // 2️⃣
+            };
+
+            public static void Save<T>(IEnumerable<T> items, string path)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                File.WriteAllText(path, JsonSerializer.Serialize(items, Opts));    // 3️⃣
+            }
+
+            public static List<T> Load<T>(string path)
+                => JsonSerializer.Deserialize<List<T>>(File.ReadAllText(path), Opts)!;
+        }
         public static void AfficherChemin(Dictionary<int, int> precedent, int depart, int arrivee, List<string> nomsGares, int[,] matricePoids = null)
         {
             var chemin = new List<int>();
@@ -697,7 +737,7 @@ WHERE ldc.idPlat IS NULL";
                 public string MetroLePlusProche { get; set; }
                 public bool Rade { get; set; }
                 public string Type { get; set; }           
-                public decimal AchatsCumulés { get; set; }   
+                public decimal AchatsCumules { get; set; }   
             }
 
             
@@ -712,7 +752,35 @@ WHERE ldc.idPlat IS NULL";
                     this.connectionString = connectionString;
                 }
 
-                
+                public void Export(string path, bool xml = false)
+                {
+                    var data = ObtenirClients("nom");             // ou autre méthode
+
+                    if (xml) XmlHelper.Save(data, path);
+                    else JsonHelper.Save(data, path);
+
+                    // ✅ message visuel
+                    Console.WriteLine($"[OK] Fichier exporté : {Path.GetFullPath(path)}");
+                }
+
+                public void Import(string path, bool xml = false)
+                {
+                    // 1. on lit le fichier
+                    var data = xml
+                        ? XmlHelper.Load<Client>(path)      // retourne List<Client>
+                        : JsonHelper.Load<Client>(path);
+
+                    // 2. pour chaque client du fichier …
+                    foreach (var c in data)
+                    {
+                        bool existe = ObtenirClients("nom") // on regarde s’il est déjà en BD
+                                       .Any(x => x.IdClient == c.IdClient);
+
+                        if (existe) ModifierClient(c);     // -> mise à jour
+                        else AjouterClient(c);      // -> insertion
+                    }
+                }
+
                 public void AjouterClient(Client client)
                 {
                     string sqlCompte = @"
@@ -902,7 +970,7 @@ WHERE idClient = @idClient
 
                     string sql = $@"
 SELECT cl.idClient, c.Id as IdCompte, c.nom, c.prénom, c.téléphone, c.adresse_mail, c.numéro, c.rue, c.Code_Postal, c.Ville, c.MetroLePlusProche, c.Radié, cl.Type,
-       IFNULL(SUM(co.CoutTotal), 0) as AchatsCumulés
+       IFNULL(SUM(co.CoutTotal), 0) as AchatsCumules
 FROM Client cl
 JOIN Compte c ON cl.Id = c.Id
 LEFT JOIN Commande co ON cl.idClient = co.idClient
@@ -933,7 +1001,7 @@ ORDER BY {orderBy}
                                     MetroLePlusProche = reader.GetString(10),
                                     Rade = reader.GetBoolean(11),
                                     Type = reader.GetString(12),
-                                    AchatsCumulés = reader.GetDecimal(13)
+                                    AchatsCumules = reader.GetDecimal(13)
                                 });
                             }
                         }
@@ -1658,7 +1726,9 @@ WHERE idCommande = @idCommande";
                 Console.WriteLine("2. Supprimer un client");
                 Console.WriteLine("3. Modifier un client");
                 Console.WriteLine("4. Afficher les clients");
-                Console.WriteLine("0. Quitter");
+                    Console.WriteLine("5. Exporter");
+                    Console.WriteLine("6. Importer");
+                    Console.WriteLine("0. Quitter");
                 Console.Write("Votre choix : ");
                 string choix = Console.ReadLine();
                 switch (choix)
@@ -1746,10 +1816,17 @@ WHERE idCommande = @idCommande";
                         Console.WriteLine("\nListe des Clients :");
                         foreach (var client in clients)
                         {
-                            Console.WriteLine($"IDClient: {client.IdClient}, Nom: {client.Nom}, Prénom: {client.Prenom}, Rue: {client.Rue}, Achats cumulés: {client.AchatsCumulés}");
+                            Console.WriteLine($"IDClient: {client.IdClient}, Nom: {client.Nom}, Prénom: {client.Prenom}, Rue: {client.Rue}");
                         }
                         break;
-                    case "0":
+                    case "5":   // Exporter
+                         repo.Export("Exports/clients.json");          // JSON
+                            break;
+
+                        case "6":  // Importer
+                            repo.Import("Exports/clients_sample.json");          // JSON
+                            break;
+                        case "0":
                         exit = true;
                         break;
                     default:
